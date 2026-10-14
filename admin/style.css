@@ -1,0 +1,235 @@
+td {  font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10px}
+.tabtitle {  font-weight: bold; background-color: #CCCCCC}
+.gbg {  background-color: #E4E4E4}
+.lgbg { background-color: #F3F3F3}
+.tbg { background-color: #E4E4E4 }
+a:visited { font-size: 11px; font-weight: bold; text-decoration: underline ; color: #008888}
+a:link { font-size: 11px; font-weight: bold; text-decoration: underline ; color: #008888}
+a:hover { font-size: 11px; font-weight: bold; text-decoration: none; color: #000000}
+a:active {  font-size: 11px; font-weight: bold; text-decoration: underline; color: #008888}
+
+a.email:visited { font-size: 10px; text-decoration: underline ; color: #008888}
+a.email:link { font-size: 10px; text-decoration: underline ; color: #008888}
+a.email:hover { font-size: 10px; text-decoration: none; color: #000000}
+a.email:active {  font-size: 10px; text-decoration: underline; color: #008888}
+.title {  font-size: 15px; font-weight: bold; color: #336666; font-family: Verdana, Arial, Helvetica, sans-serif; background-color: #CCCCCC; height: 30px; text-align: center}
+.term {
+	font-weight: bold;
+	color: #993300;
+	background-color: #FFe6cc;
+	height: 18px;
+	;
+	text-align: center;
+	font-size: 12px;
+}
+.terms { font-weight: bold; background-color: #FCEDE0}
+.term10 { font-weight: bold; color: #336666; background-color: #BDEAEA; font-size: 11px; text-align: center}
+.border {  background-color: #CCCCCC}
+.titles { font-size: 14px; font-weight: bold; color: #478D8D; font-family: Verdana, Arial, Helvetica, sans-serif; background-color: #DFF4F4; height: 22px ; text-align: center}
+.border2 { background-color: #CCCCCC}
+.path { font-weight: bold; background-color: #CCCCCC; font-size: 12px; height: 25px ; text-align: center}
+.umesh {
+	font-family: Verdana;
+	font-size: 12px;
+	font-style: normal;
+	line-height: 18px;
+	font-weight: bold;
+	font-variant: normal;
+	text-transform: none;
+	color: #00CC99;
+	background-color: #CCCCCC;
+}
+.maintaxt {
+	background-color: #F9FBE1;
+	word-spacing: normal;
+}
+.maintaxt {
+	font-family: Verdana;
+	font-size: 12px;
+}
+.mainnew {
+	font-family: Verdana;
+	font-size: 12px;
+	font-style: normal;
+	line-height: 18px;
+}
+.paragraph {
+	font-family: Verdana;
+	font-size: 12px;
+	line-height: 19px;
+}
+.deptpara {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-style: normal;
+	line-height: 18px;
+	font-weight: bold;
+	color: #294EF5;
+	background-color: #F2F2FF;
+	background-position: center center;
+	text-align: center;
+}
+.forrajkotpage {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-style: normal;
+	line-height: 17px;
+	color: #000000;
+	text-align: justify;
+	vertical-align: middle;
+	height: auto;
+}
+.resulttitle {  font-size: 14px; font-weight: bold; color: #336666; font-family: Verdana, Arial, Helvetica, sans-serif; background-color: #CCCCCC height: 30px; text-align: left}
+.textbox1 {text-align:center; font-family:Verdana, Arial, Helvetica, sans-serif; color:#330033}
+.listmenu {font-family:verdana; text-align:center; font-size:12px}
+.textbox2 {font-family:Verdana, Arial, Helvetica, sans-serif; text-align:left; color:#330033}
+.textarea {font-family:Verdana, Arial, Helvetica, sans-serif; font-size:12px}
+
+/* ================================
+   MODERN ADMIN UPGRADE
+   ================================ */
+
+body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    background: #f1f3f6;
+}
+
+/* Main content area */
+.admin-card,
+table.border {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    padding: 15px;
+}
+
+/* Title */
+.title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #333;
+    padding: 10px 0 15px 0;
+}
+
+/* Staff table */
+.modern-table,
+table.lgbg,
+table.border table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* Header row */
+.lgbg:first-child td,
+.modern-table th {
+    background: #2c3e50;
+    color: #ffffff;
+    font-weight: 600;
+    padding: 10px;
+}
+
+/* Table rows */
+.lgbg td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Hover effect */
+.lgbg:hover {
+    background: #f9fafb;
+}
+
+/* Inputs */
+.textbox1 {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+}
+
+.textbox1:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+/* Buttons */
+input[type="submit"],
+button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* Update button */
+input[name="update"] {
+    background: #3498db;
+    color: #fff;
+}
+
+input[name="update"]:hover {
+    background: #2980b9;
+}
+
+/* Delete button */
+input[name="delete"] {
+    background: #e74c3c;
+    color: #fff;
+}
+
+input[name="delete"]:hover {
+    background: #c0392b;
+}
+
+/* Add faculty button */
+.add-btn img,
+a img[src*="add"] {
+    transition: transform 0.2s ease;
+}
+
+a img[src*="add"]:hover {
+    transform: scale(1.1);
+}
+
+/* Sidebar cleanup */
+td[background*="side.gif"] a {
+    text-decoration: none;
+    font-weight: 500;
+}
+
+td[background*="side.gif"] a:hover {
+    color: #3498db;
+}
+
+/* Footer */
+td[background*="bottom.gif"] {
+    color: #fff;
+    font-size: 13px;
+}
+
+/* Custom Scrollbar for Sidebar */
+.sidebar::-webkit-scrollbar {
+    width: 5px; /* Very thin */
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--sidebar-bg); 
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #4b5a71; /* Slightly lighter than the sidebar bg */
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #5c6d86; 
+}
+
+/* Ensure the sidebar can actually scroll if content is too long */
+.sidebar {
+    overflow-y: auto;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #4b5a71 var(--sidebar-bg); /* For Firefox */
+}
