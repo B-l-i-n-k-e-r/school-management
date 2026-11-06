@@ -27,44 +27,57 @@ if (!$student) {
 }
 
 $student_id = (int) $student['student_id'];
+$student_form = $student['form'] ?? '';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_subjects'])) {
-    $selected = $_POST['subjects'] ?? [];
+    // Double-check they haven't already registered
+    $check_reg = $conn->prepare("SELECT COUNT(*) as c FROM student_subjects WHERE student_id = ?");
+    $check_reg->bind_param("i", $student_id);
+    $check_reg->execute();
+    $has_registered = $check_reg->get_result()->fetch_assoc()['c'] > 0;
+    $check_reg->close();
 
-    if (empty($selected)) {
-        $message = 'Please select at least one subject.';
+    if ($has_registered) {
+        $message = 'You have already registered for your subjects. Changes are locked.';
         $message_type = 'warning';
     } else {
-        $conn->begin_transaction();
-        try {
-            $ins = $conn->prepare("
-                INSERT IGNORE INTO student_subjects (student_id, subject_id, registration_date)
-                VALUES (?, ?, NOW())
-            ");
-            $count = 0;
-            foreach ($selected as $sub_id) {
-                $sub_id = (int) $sub_id;
-                $ins->bind_param("ii", $student_id, $sub_id);
-                $ins->execute();
-                $count++;
+        $selected = $_POST['subjects'] ?? [];
+        if (empty($selected)) {
+            $message = 'Please select at least one subject.';
+            $message_type = 'warning';
+        } else {
+            $conn->begin_transaction();
+            try {
+                $ins = $conn->prepare("INSERT IGNORE INTO student_subjects (student_id, subject_id, registration_date) VALUES (?, ?, NOW())");
+                $count = 0;
+                foreach ($selected as $sub_id) {
+                    $sub_id = (int) $sub_id;
+                    $ins->bind_param("ii", $student_id, $sub_id);
+                    $ins->execute();
+                    $count++;
+                }
+                $ins->close();
+                $conn->commit();
+                $message = "Registered successfully ($count subject" . ($count === 1 ? '' : 's') . " selected).";
+                $message_type = 'success';
+            } catch (Exception $e) {
+                $conn->rollback();
+                $message = 'Registration failed: ' . $e->getMessage();
+                $message_type = 'danger';
             }
-            $ins->close();
-            $conn->commit();
-            $message = "Registered successfully ($count subject" . ($count === 1 ? '' : 's') . " selected).";
-            $message_type = 'success';
-        } catch (Exception $e) {
-            $conn->rollback();
-            $message = 'Registration failed: ' . $e->getMessage();
-            $message_type = 'danger';
         }
     }
 }
 
-// Fetch available subjects
+// Fetch available subjects ONLY for the student's form
 $available_subjects = [];
-$sub_stmt = $conn->query("SELECT subject_id, subject_name, form, term FROM subjects ORDER BY subject_name ASC");
-while ($row = $sub_stmt->fetch_assoc()) $available_subjects[] = $row;
+$sub_stmt = $conn->prepare("SELECT subject_id, subject_name, form, term FROM subjects WHERE form = ? ORDER BY subject_name ASC");
+$sub_stmt->bind_param("s", $student_form);
+$sub_stmt->execute();
+$sub_res = $sub_stmt->get_result();
+while ($row = $sub_res->fetch_assoc()) $available_subjects[] = $row;
+$sub_stmt->close();
 
 // Fetch already registered IDs
 $registered_ids = [];
@@ -74,6 +87,9 @@ $reg_stmt->execute();
 $reg_res = $reg_stmt->get_result();
 while ($row = $reg_res->fetch_assoc()) $registered_ids[] = (int) $row['subject_id'];
 $reg_stmt->close();
+
+// Check if the student has completed registration
+$is_locked = count($registered_ids) > 0;
 
 $student_display_name = $student['full_name'] ?? 'Student';
 $active_page = 'registration';
@@ -114,6 +130,10 @@ $extra_label = 'Subject Registration';
         .form-check-input:checked { background-color: #1a3066; border-color: #1a3066; }
         .form-check-input { cursor: pointer; }
 
+        /* Locked State Styling */
+        .locked-banner { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 12px; padding: 15px 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .locked-banner i { font-size: 1.5rem; }
+
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
 
@@ -134,7 +154,9 @@ $extra_label = 'Subject Registration';
     <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
         <div>
             <h2 class="fw-bold mb-1">Subject Registration</h2>
-            <p class="text-muted small mb-0">Select the subjects you'll take this semester</p>
+            <p class="text-muted small mb-0">
+                <?php echo $is_locked ? 'Your registered subjects for this semester' : 'Select the subjects you\'ll take this semester'; ?>
+            </p>
         </div>
         <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-2 fw-bold">
             <?php echo htmlspecialchars($student_display_name); ?>
@@ -151,12 +173,22 @@ $extra_label = 'Subject Registration';
         </div>
     <?php endif; ?>
 
+    <?php if ($is_locked): ?>
+        <div class="locked-banner">
+            <i class="bi bi-lock-fill"></i>
+            <div>
+                <strong>Registration Complete</strong><br>
+                <span class="small">Your subjects have been locked. Please contact the administration if you need to make changes.</span>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="card p-4">
         <?php if (empty($available_subjects)): ?>
             <div class="text-center py-5">
                 <i class="bi bi-journal-x fs-1 text-muted d-block mb-3"></i>
                 <h5 class="fw-bold text-muted">No subjects available</h5>
-                <p class="text-muted mb-0">Check back later — the school hasn't published any subjects yet.</p>
+                <p class="text-muted mb-0">There are no subjects published for <strong><?php echo htmlspecialchars($student_form); ?></strong> yet.</p>
             </div>
         <?php else: ?>
             <form method="POST">
@@ -164,7 +196,9 @@ $extra_label = 'Subject Registration';
                     <table class="table align-middle mb-0">
                         <thead class="bg-light">
                             <tr class="small text-muted fw-bold text-uppercase">
-                                <th style="width: 60px;" class="text-center">Select</th>
+                                <?php if (!$is_locked): ?>
+                                    <th style="width: 60px;" class="text-center">Select</th>
+                                <?php endif; ?>
                                 <th>Subject</th>
                                 <th>Form</th>
                                 <th>Term</th>
@@ -175,19 +209,29 @@ $extra_label = 'Subject Registration';
                             <?php foreach ($available_subjects as $sub):
                                 $sid = (int) $sub['subject_id'];
                                 $is_registered = in_array($sid, $registered_ids);
+                                
+                                // If locked, only show the subjects they actually registered
+                                if ($is_locked && !$is_registered) continue;
                             ?>
                                 <tr class="subject-row">
-                                    <td class="text-center">
-                                        <input class="form-check-input" type="checkbox"
-                                               name="subjects[]"
-                                               value="<?php echo $sid; ?>"
-                                               id="sub_<?php echo $sid; ?>"
-                                               <?php echo $is_registered ? 'checked' : ''; ?>>
-                                    </td>
+                                    <?php if (!$is_locked): ?>
+                                        <td class="text-center">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="subjects[]"
+                                                   value="<?php echo $sid; ?>"
+                                                   id="sub_<?php echo $sid; ?>">
+                                        </td>
+                                    <?php endif; ?>
                                     <td>
-                                        <label for="sub_<?php echo $sid; ?>" class="fw-bold mb-0" style="cursor:pointer;">
-                                            <?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?>
-                                        </label>
+                                        <?php if (!$is_locked): ?>
+                                            <label for="sub_<?php echo $sid; ?>" class="fw-bold mb-0" style="cursor:pointer;">
+                                                <?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?>
+                                            </label>
+                                        <?php else: ?>
+                                            <span class="fw-bold mb-0 text-dark">
+                                                <i class="bi bi-book text-primary me-2"></i><?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?>
+                                            </span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-muted"><?php echo htmlspecialchars($sub['form'] ?? '—'); ?></td>
                                     <td class="text-muted"><?php echo htmlspecialchars($sub['term'] ?? '—'); ?></td>
@@ -206,15 +250,17 @@ $extra_label = 'Subject Registration';
                     </table>
                 </div>
 
-                <div class="mt-4 d-flex justify-content-end gap-2 flex-wrap">
-                    <button type="reset" class="btn btn-light border rounded-3 px-4">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
-                    </button>
-                    <button type="submit" name="register_subjects"
-                            class="btn btn-primary rounded-3 px-4 fw-bold">
-                        <i class="bi bi-check2-circle me-2"></i>Confirm Registration
-                    </button>
-                </div>
+                <?php if (!$is_locked): ?>
+                    <div class="mt-4 d-flex justify-content-end gap-2 flex-wrap">
+                        <button type="reset" class="btn btn-light border rounded-3 px-4">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                        </button>
+                        <button type="submit" name="register_subjects"
+                                class="btn btn-primary rounded-3 px-4 fw-bold">
+                            <i class="bi bi-check2-circle me-2"></i>Confirm Registration
+                        </button>
+                    </div>
+                <?php endif; ?>
             </form>
         <?php endif; ?>
     </div>

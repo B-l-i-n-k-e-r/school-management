@@ -169,7 +169,7 @@
     <div class="nav-links">
         <a href="index.php">Home</a>
         <a href="about.php">About</a>
-        <a href="year.php">Years</a>
+        <a href="year.php">Classes</a>
         <a href="staff.php">Staff</a>
         <a href="admission.php">Admission</a>
         <a href="activity.php">Activities</a>

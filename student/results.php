@@ -88,6 +88,7 @@ $extra_label = 'Exam Results';
         }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
+        /* Sidebar Styles */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
@@ -110,10 +111,38 @@ $extra_label = 'Exam Results';
 
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .summary-box { background: linear-gradient(135deg, #1a3066, #2c3a4d); color: white; border-radius: 16px; padding: 24px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .summary-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; }
+        /* --- MODERN UI STYLES --- */
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
+        
+        /* Modern Hero Card */
+        .summary-box { 
+            background: linear-gradient(135deg, #1a3066 0%, #2d4a8a 100%); 
+            color: white; 
+            border-radius: 20px; 
+            padding: 30px; 
+            position: relative; 
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(26, 48, 102, 0.2);
+        }
+        /* Decorative circle */
+        .summary-box::after {
+            content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px;
+            background: rgba(255,255,255,0.05); border-radius: 50%;
+        }
 
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .summary-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; }
+
+        /* Modern Stat Cards */
+        .stat-card { background: white; border-radius: 20px; padding: 24px; display: flex; align-items: center; gap: 20px; height: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .stat-icon { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+        .stat-icon.blue { background: #eff6ff; color: #3b82f6; }
+        .stat-icon.success { background: #ecfdf5; color: #10b981; }
+        .stat-icon.danger { background: #fef2f2; color: #ef4444; }
+
+        /* Table Styles */
+        .table th { font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; font-weight: 800; padding: 20px 15px; border-bottom: 2px solid #e2e8f0; }
+        .table td { padding: 20px 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+        .table tbody tr:hover { background-color: #f8fafc; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -122,12 +151,16 @@ $extra_label = 'Exam Results';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
 
         @media print {
             .sidebar, .topbar, .no-print, .sidebar-overlay { display: none !important; }
-            .main-content { margin-left: 0 !important; padding: 20px !important; }
-            .card, .summary-box { box-shadow: none !important; }
+            .main-content { margin-left: 0 !important; padding: 0 !important; }
+            .card, .summary-box, .stat-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+            .summary-box { background: #fff !important; color: #000 !important; border: 2px solid #1a3066 !important; }
+            .summary-box::after { display: none; }
+            .table td, .table th { border-color: #ddd !important; }
         }
     </style>
 </head>
@@ -140,75 +173,95 @@ $extra_label = 'Exam Results';
 
     <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3 no-print">
         <div>
-            <h2 class="fw-bold mb-1">Academic Performance</h2>
+            <h2 class="fw-bold mb-1 text-dark">Academic Performance</h2>
             <p class="text-muted small mb-0">Official results slip for <strong><?php echo htmlspecialchars($student_display_name); ?></strong></p>
         </div>
         <?php if (!$is_blocked && !empty($results)): ?>
-            <button onclick="window.print()" class="btn btn-primary rounded-3 px-4 shadow-sm">
-                <i class="bi bi-printer me-2"></i>Print Transcript
+            <button onclick="window.print()" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                <i class="bi bi-printer-fill me-2"></i>Print Transcript
             </button>
         <?php endif; ?>
     </div>
 
     <?php if ($is_blocked): ?>
 
-        <div class="card p-5 text-center">
-            <div class="mb-3">
-                <i class="bi bi-shield-lock-fill text-danger" style="font-size: 3.5rem;"></i>
+        <!-- Blocked State -->
+        <div class="card p-5 text-center bg-white">
+            <div class="d-inline-flex align-items-center justify-content-center bg-danger-subtle text-danger rounded-circle mb-4" style="width: 100px; height: 100px;">
+                <i class="bi bi-shield-lock-fill" style="font-size: 3rem;"></i>
             </div>
-            <h3 class="fw-bold mb-2">Results Withheld</h3>
+            <h3 class="fw-bold mb-2 text-dark">Results Withheld</h3>
             <p class="text-muted mx-auto mb-4" style="max-width: 520px;">
                 Your results for this semester have been withheld due to an outstanding fee balance of
-                <strong class="text-danger">KES <?php echo number_format($balance, 2); ?></strong>.
+                <strong class="text-danger fs-5">KES <?php echo number_format($balance, 2); ?></strong>.
                 Please clear your dues to view your grades.
             </p>
-            <a href="fees.php" class="btn btn-primary rounded-3 px-4 mx-auto" style="width: fit-content;">
+            <a href="fees.php" class="btn btn-primary rounded-pill px-4 mx-auto fw-bold shadow-sm" style="width: fit-content;">
                 <i class="bi bi-wallet2 me-2"></i>View Fee Balance
             </a>
         </div>
 
     <?php else: ?>
 
-        <div class="row g-3 mb-4">
+        <!-- Modern Summary Row -->
+        <div class="row g-4 mb-4">
+            <!-- Average Score (Hero) -->
             <div class="col-md-4">
-                <div class="summary-box">
+                <div class="summary-box h-100 d-flex flex-column justify-content-center">
                     <div class="summary-label">Average Score</div>
-                    <div class="display-5 fw-bold mb-0 mt-2"><?php echo number_format($average, 1); ?>%</div>
+                    <div class="display-4 fw-bold mb-0 mt-1"><?php echo number_format($average, 1); ?>%</div>
                 </div>
             </div>
+
+            <!-- Subjects Taken -->
             <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="summary-label text-muted">Subjects Taken</div>
-                    <div class="display-5 fw-bold mb-0 mt-2 text-dark"><?php echo $subject_count; ?></div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <i class="bi bi-journal-bookmark-fill"></i>
+                    </div>
+                    <div>
+                        <div class="summary-label text-muted">Subjects Taken</div>
+                        <div class="display-6 fw-bold mb-0 text-dark"><?php echo $subject_count; ?></div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Overall Status -->
             <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="summary-label text-muted">Overall Status</div>
-                    <div class="display-5 fw-bold mb-0 mt-2 <?php echo $average >= 50 ? 'text-success' : 'text-danger'; ?>">
-                        <?php echo $average >= 50 ? 'Pass' : 'Review'; ?>
+                <div class="stat-card">
+                    <div class="stat-icon <?php echo $average >= 50 ? 'success' : 'danger'; ?>">
+                        <i class="bi <?php echo $average >= 50 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'; ?>"></i>
+                    </div>
+                    <div>
+                        <div class="summary-label text-muted">Overall Status</div>
+                        <div class="display-6 fw-bold mb-0 <?php echo $average >= 50 ? 'text-success' : 'text-danger'; ?>">
+                            <?php echo $average >= 50 ? 'Pass' : 'Review'; ?>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card overflow-hidden">
-            <div class="card-header bg-white py-3 px-4 border-0">
-                <h5 class="mb-0 fw-bold">Results Slip</h5>
+        <!-- Results Table -->
+        <div class="card bg-white">
+            <div class="card-header bg-white py-4 px-4 border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-file-earmark-text-fill me-2 text-primary"></i>Results Slip</h5>
             </div>
 
             <?php if (empty($results)): ?>
                 <div class="p-5 text-center">
-                    <i class="bi bi-journal-x fs-1 text-muted d-block mb-3"></i>
-                    <p class="text-muted mb-0">No results published yet.</p>
-                    <small class="text-muted">Once your teachers publish marks, they'll appear here.</small>
+                    <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                        <i class="bi bi-journal-x fs-1 text-muted"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">No results published</h5>
+                    <p class="text-muted mb-0">Once your teachers publish marks, they'll appear here.</p>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table align-middle mb-0">
                         <thead class="bg-light">
-                            <tr class="small text-muted fw-bold text-uppercase">
-                                <th class="ps-4 py-3">Subject</th>
+                            <tr>
+                                <th class="ps-4">Subject</th>
                                 <th class="text-center">Exam</th>
                                 <th class="text-center">Marks</th>
                                 <th class="text-center">Grade</th>
@@ -220,31 +273,33 @@ $extra_label = 'Exam Results';
                                 $marks = (float) ($r['marks'] ?? 0);
                                 $grade = $r['grade'] ?: '—';
                                 $grade_class = match(true) {
-                                    $marks >= 70 => 'bg-success-subtle text-success',
-                                    $marks >= 60 => 'bg-info-subtle text-info',
-                                    $marks >= 50 => 'bg-primary-subtle text-primary',
-                                    $marks >= 40 => 'bg-warning-subtle text-warning',
-                                    $marks > 0   => 'bg-danger-subtle text-danger',
-                                    default      => 'bg-secondary-subtle text-secondary',
+                                    $marks >= 70 => 'bg-success-subtle text-success border border-success-subtle',
+                                    $marks >= 60 => 'bg-info-subtle text-info border border-info-subtle',
+                                    $marks >= 50 => 'bg-primary-subtle text-primary border border-primary-subtle',
+                                    $marks >= 40 => 'bg-warning-subtle text-warning border border-warning-subtle',
+                                    $marks > 0   => 'bg-danger-subtle text-danger border border-danger-subtle',
+                                    default      => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
                                 };
                             ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <div class="fw-bold"><?php echo htmlspecialchars($r['subject_name'] ?? '—'); ?></div>
+                                        <div class="fw-bold text-dark fs-6"><?php echo htmlspecialchars($r['subject_name'] ?? '—'); ?></div>
                                     </td>
-                                    <td class="text-center small text-muted">
-                                        <?php echo htmlspecialchars($r['exam_name'] ?? '—'); ?>
+                                    <td class="text-center">
+                                        <span class="fw-bold small text-dark"><?php echo htmlspecialchars($r['exam_name'] ?? '—'); ?></span>
                                         <?php if (!empty($r['term'])): ?>
-                                            <br><span class="text-muted" style="font-size: 0.7rem;"><?php echo htmlspecialchars($r['term']); ?></span>
+                                            <br><span class="badge bg-light text-secondary border mt-1"><?php echo htmlspecialchars($r['term']); ?></span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="text-center fw-bold"><?php echo number_format($marks, 1); ?></td>
                                     <td class="text-center">
-                                        <span class="badge rounded-pill <?php echo $grade_class; ?> px-3 py-2">
+                                        <span class="fs-5 fw-bold text-dark"><?php echo number_format($marks, 1); ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill <?php echo $grade_class; ?> px-3 py-2 fs-6">
                                             <?php echo htmlspecialchars($grade); ?>
                                         </span>
                                     </td>
-                                    <td class="pe-4 small text-muted"><?php echo htmlspecialchars($r['remarks'] ?: '—'); ?></td>
+                                    <td class="pe-4 small text-muted fw-medium"><?php echo htmlspecialchars($r['remarks'] ?: '—'); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -253,12 +308,15 @@ $extra_label = 'Exam Results';
             <?php endif; ?>
         </div>
 
-        <div class="mt-4 p-3 bg-white rounded-3 shadow-sm border-start border-4 border-primary no-print">
-            <p class="mb-0 small text-muted">
-                <i class="bi bi-info-circle-fill me-2 text-primary"></i>
-                <strong>Grading Key:</strong> A (70-100), B (60-69), C (50-59), D (40-49), F (0-39).
-                Contact the Registrar's office for any discrepancies.
-            </p>
+        <!-- Footer Note -->
+        <div class="mt-4 p-4 bg-white rounded-4 shadow-sm border-start border-4 border-primary no-print">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-info-circle-fill fs-4 text-primary"></i>
+                <p class="mb-0 text-muted fw-medium">
+                    <strong>Grading Key:</strong> A (70-100), B (60-69), C (50-59), D (40-49), F (0-39).
+                    Contact the Registrar's office for any discrepancies.
+                </p>
+            </div>
         </div>
 
     <?php endif; ?>

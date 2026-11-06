@@ -26,7 +26,7 @@ if (!$student) {
 
 $student_id = (int) $student['student_id'];
 
-// Fetch registered subjects + coursework scores (LEFT JOIN so subjects without scores still appear)
+// Fetch registered subjects + coursework scores
 $coursework_records = [];
 $cw_stmt = $conn->prepare("
     SELECT
@@ -107,6 +107,7 @@ $extra_label = 'Course Work';
         }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
+        /* Sidebar Styles */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
@@ -129,12 +130,47 @@ $extra_label = 'Course Work';
 
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        /* --- MODERN UI STYLES --- */
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
+        
+        /* Modern Hero Card */
+        .summary-box { 
+            background: linear-gradient(135deg, #1a3066 0%, #2d4a8a 100%); 
+            color: white; 
+            border-radius: 20px; 
+            padding: 30px; 
+            position: relative; 
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(26, 48, 102, 0.2);
+        }
+        /* Decorative circle for the hero card */
+        .summary-box::after {
+            content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px;
+            background: rgba(255,255,255,0.05); border-radius: 50%;
+        }
 
-        .summary-box { background: linear-gradient(135deg, #1a3066, #2c3a4d); color: white; border-radius: 16px; padding: 24px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .summary-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; }
+        .summary-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; }
 
-        .score-pill { background: #e0e7ff; color: #3730a3; font-weight: 700; border-radius: 8px; padding: 4px 12px; font-size: 0.9rem; }
+        /* Modern Stat Cards */
+        .stat-card { background: white; border-radius: 20px; padding: 24px; display: flex; align-items: center; gap: 20px; height: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .stat-icon { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+        .stat-icon.blue { background: #eff6ff; color: #3b82f6; }
+        .stat-icon.yellow { background: #fffbeb; color: #f59e0b; }
+
+        /* Table Styles */
+        .table th { font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; font-weight: 800; padding: 20px 15px; border-bottom: 2px solid #e2e8f0; }
+        .table td { padding: 20px 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+        .table tbody tr:hover { background-color: #f8fafc; }
+
+        /* Score Pills */
+        .score-pill { background: #f1f5f9; color: #334155; font-weight: 700; border-radius: 12px; padding: 6px 14px; font-size: 0.95rem; border: 1px solid #e2e8f0; display: inline-block; min-width: 45px; }
+        .total-pill { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 800; border-radius: 12px; padding: 8px 16px; font-size: 0.95rem; display: inline-block; }
+
+        /* Status Icons */
+        .status-badge { font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .status-on-track { color: #10b981; }
+        .status-average { color: #f59e0b; }
+        .status-low { color: #ef4444; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -143,11 +179,12 @@ $extra_label = 'Course Work';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
         @media print {
             .sidebar, .topbar, .no-print, .sidebar-overlay { display: none !important; }
-            .main-content { margin-left: 0 !important; padding: 20px !important; }
-            .card, .summary-box { box-shadow: none !important; }
+            .main-content { margin-left: 0 !important; padding: 0 !important; }
+            .card, .summary-box, .stat-card { box-shadow: none !important; border: 1px solid #ccc !important; }
         }
     </style>
 </head>
@@ -160,67 +197,85 @@ $extra_label = 'Course Work';
 
     <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3 no-print">
         <div>
-            <h2 class="fw-bold mb-1">Course Work Assessment</h2>
+            <h2 class="fw-bold mb-1 text-dark">Course Work Assessment</h2>
             <p class="text-muted small mb-0">Continuous Assessment Tests (CATs) and assignment results</p>
         </div>
         <?php if (!empty($coursework_records)): ?>
-            <button onclick="window.print()" class="btn btn-outline-primary rounded-3 px-4">
+            <button onclick="window.print()" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm">
                 <i class="bi bi-printer me-2"></i>Print Report
             </button>
         <?php endif; ?>
     </div>
 
     <?php if (!empty($coursework_records)): ?>
-        <!-- Summary cards -->
-        <div class="row g-3 mb-4">
+        <!-- Modern Summary Cards -->
+        <div class="row g-4 mb-4">
+            <!-- Average Score (Hero) -->
             <div class="col-md-4">
-                <div class="summary-box">
+                <div class="summary-box h-100 d-flex flex-column justify-content-center">
                     <div class="summary-label">Average Score</div>
-                    <div class="display-5 fw-bold mb-0 mt-2"><?php echo $avg_percent; ?>%</div>
-                    <div class="small opacity-75 mt-1">Total <?php echo number_format($grand_total, 1); ?> / <?php echo $max_possible; ?></div>
+                    <div class="display-4 fw-bold mb-0 mt-1"><?php echo $avg_percent; ?>%</div>
+                    <div class="small opacity-75 mt-2">Total <?php echo number_format($grand_total, 1); ?> / <?php echo $max_possible; ?></div>
                 </div>
             </div>
+            
+            <!-- Subjects Registered -->
             <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="summary-label text-muted">Subjects Registered</div>
-                    <div class="display-5 fw-bold mb-0 mt-2 text-dark"><?php echo $subject_count; ?></div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <i class="bi bi-journal-bookmark-fill"></i>
+                    </div>
+                    <div>
+                        <div class="summary-label text-muted">Subjects Registered</div>
+                        <div class="display-6 fw-bold mb-0 text-dark"><?php echo $subject_count; ?></div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Scores Recorded -->
             <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="summary-label text-muted">Scores Recorded</div>
-                    <div class="display-5 fw-bold mb-0 mt-2 <?php echo $completed === $subject_count ? 'text-success' : 'text-warning'; ?>">
-                        <?php echo $completed; ?> / <?php echo $subject_count; ?>
+                <div class="stat-card">
+                    <div class="stat-icon yellow">
+                        <i class="bi bi-clipboard-check-fill"></i>
+                    </div>
+                    <div>
+                        <div class="summary-label text-muted">Scores Recorded</div>
+                        <div class="display-6 fw-bold mb-0 <?php echo $completed === $subject_count ? 'text-success' : 'text-warning'; ?>">
+                            <?php echo $completed; ?> <span class="fs-5 text-muted">/ <?php echo $subject_count; ?></span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     <?php endif; ?>
 
-    <!-- Coursework table -->
-    <div class="card overflow-hidden">
-        <div class="card-header bg-white py-3 px-4 border-0">
-            <h5 class="mb-0 fw-bold">Marks Breakdown</h5>
+    <!-- Coursework Table -->
+    <div class="card bg-white">
+        <div class="card-header bg-white py-4 px-4 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-list-task me-2 text-primary"></i>Marks Breakdown</h5>
         </div>
 
         <?php if (empty($coursework_records)): ?>
             <div class="p-5 text-center">
-                <i class="bi bi-folder2-open fs-1 text-muted d-block mb-3"></i>
-                <p class="text-muted mb-3">No subjects registered for this semester.</p>
-                <a href="registration.php" class="btn btn-primary rounded-3 px-4">
-                    <i class="bi bi-journal-check me-1"></i>Register Now
+                <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                    <i class="bi bi-folder2-open fs-1 text-muted"></i>
+                </div>
+                <h5 class="fw-bold text-dark">No subjects registered</h5>
+                <p class="text-muted mb-4">You need to register for subjects to view your coursework marks.</p>
+                <a href="registration.php" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                    <i class="bi bi-journal-check me-2"></i>Register Now
                 </a>
             </div>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table align-middle mb-0">
                     <thead class="bg-light">
-                        <tr class="small text-muted fw-bold text-uppercase">
-                            <th class="ps-4 py-3">Subject</th>
-                            <th class="text-center">CAT 1 <span class="text-muted">(15)</span></th>
-                            <th class="text-center">CAT 2 <span class="text-muted">(15)</span></th>
-                            <th class="text-center">Assignment <span class="text-muted">(10)</span></th>
-                            <th class="text-center">Total <span class="text-muted">(40)</span></th>
+                        <tr>
+                            <th class="ps-4">Subject</th>
+                            <th class="text-center">CAT 1 <span class="text-muted fw-normal">(15)</span></th>
+                            <th class="text-center">CAT 2 <span class="text-muted fw-normal">(15)</span></th>
+                            <th class="text-center">Assign <span class="text-muted fw-normal">(10)</span></th>
+                            <th class="text-center">Total <span class="text-muted fw-normal">(40)</span></th>
                             <th class="pe-4 text-center">Status</th>
                         </tr>
                     </thead>
@@ -228,9 +283,9 @@ $extra_label = 'Course Work';
                         <?php foreach ($coursework_records as $row): ?>
                             <tr>
                                 <td class="ps-4">
-                                    <div class="fw-bold"><?php echo htmlspecialchars($row['subject_name']); ?></div>
+                                    <div class="fw-bold text-dark fs-6"><?php echo htmlspecialchars($row['subject_name']); ?></div>
                                     <?php if ($row['academic_period']): ?>
-                                        <div class="small text-muted text-uppercase"><?php echo htmlspecialchars($row['academic_period']); ?></div>
+                                        <span class="badge bg-light text-secondary border mt-1"><?php echo htmlspecialchars($row['academic_period']); ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center">
@@ -255,19 +310,19 @@ $extra_label = 'Course Work';
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge bg-primary-subtle text-primary-emphasis fw-bold fs-6 px-3 py-2">
-                                        <?php echo number_format($row['total'], 1); ?> / 40
+                                    <span class="total-pill">
+                                        <?php echo number_format($row['total'], 1); ?>
                                     </span>
                                 </td>
                                 <td class="pe-4 text-center">
                                     <?php if ($row['cat_1'] === null): ?>
-                                        <span class="text-muted small">Pending</span>
+                                        <span class="text-muted small fw-bold">Pending</span>
                                     <?php elseif ($row['total'] >= 24): ?>
-                                        <span class="text-success small fw-bold"><i class="bi bi-check-circle-fill me-1"></i>On Track</span>
+                                        <span class="status-badge status-on-track"><i class="bi bi-check-circle-fill"></i> On Track</span>
                                     <?php elseif ($row['total'] >= 16): ?>
-                                        <span class="text-warning small fw-bold"><i class="bi bi-dash-circle-fill me-1"></i>Average</span>
+                                        <span class="status-badge status-average"><i class="bi bi-dash-circle-fill"></i> Average</span>
                                     <?php else: ?>
-                                        <span class="text-danger small fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Low</span>
+                                        <span class="status-badge status-low"><i class="bi bi-exclamation-triangle-fill"></i> Low</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -279,12 +334,14 @@ $extra_label = 'Course Work';
     </div>
 
     <?php if (!empty($coursework_records)): ?>
-        <div class="mt-4 p-3 bg-white rounded-3 shadow-sm border-start border-4 border-primary no-print">
-            <p class="mb-0 small text-muted">
-                <i class="bi bi-info-circle-fill me-2 text-primary"></i>
-                <strong>Note:</strong> Coursework contributes <strong>40%</strong> to your final grade.
-                CAT 1 + CAT 2 + Assignment = up to 40 marks.
-            </p>
+        <div class="mt-4 p-4 bg-white rounded-4 shadow-sm border-start border-4 border-primary no-print">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-info-circle-fill fs-4 text-primary"></i>
+                <p class="mb-0 text-muted fw-medium">
+                    <strong>Note:</strong> Coursework contributes <strong>40%</strong> to your final grade.
+                    CAT 1 + CAT 2 + Assignment = up to 40 marks.
+                </p>
+            </div>
         </div>
     <?php endif; ?>
 

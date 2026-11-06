@@ -47,34 +47,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
     } elseif (empty($marks_array)) {
         $error_msg = 'No marks entered.';
     } else {
-        $saved = 0;
-        foreach ($marks_array as $student_id => $score) {
-            if ($score === '' || $score === null) continue;
-            $student_id = (int) $student_id;
-            $score      = (float) $score;
-
-            // ── NOTE: this uses `exam_type` which doesn't exist in your schema.
-            //    See the migration options at the bottom of this message.
-            $check = $conn->prepare("SELECT result_id FROM results WHERE student_id = ? AND subject_id = ? LIMIT 1");
-            $check->bind_param("ii", $student_id, $subject_id);
-            $check->execute();
-            $exists = $check->get_result()->num_rows;
-            $check->close();
-
-            if ($exists > 0) {
-                $update = $conn->prepare("UPDATE results SET marks = ?, recorded_by = ? WHERE student_id = ? AND subject_id = ?");
-                $update->bind_param("diii", $score, $staff_id, $student_id, $subject_id);
-                $update->execute();
-                $update->close();
-            } else {
-                $insert = $conn->prepare("INSERT INTO results (student_id, subject_id, marks, recorded_by) VALUES (?, ?, ?, ?)");
-                $insert->bind_param("iidi", $student_id, $subject_id, $score, $staff_id);
-                $insert->execute();
-                $insert->close();
-            }
-            $saved++;
+        // Search by exam_name
+        $exam_id = 0;
+        $exam_lookup = $conn->prepare("SELECT exam_id FROM exams WHERE exam_name = ? LIMIT 1");
+        $exam_lookup->bind_param("s", $exam_type);
+        $exam_lookup->execute();
+        $exam_res = $exam_lookup->get_result()->fetch_assoc();
+        $exam_lookup->close();
+        
+        if ($exam_res) {
+            $exam_id = (int) $exam_res['exam_id'];
+        } else {
+            $error_msg = "Error: The selected Exam does not exist in the database.";
         }
-        $success_msg = "$saved marks saved for $assigned_subject_name ($exam_type).";
+
+        // Only proceed if we found a valid exam_id
+        if ($exam_id > 0) {
+            $saved = 0;
+            foreach ($marks_array as $student_id => $score) {
+                if ($score === '' || $score === null) continue;
+                
+                $student_id = (int) $student_id;
+                $score      = (float) $score;
+
+                // Calculate Grade and Remarks automatically
+                if ($score >= 80)      { $grade = 'A'; $remarks = 'Excellent'; }
+                elseif ($score >= 75)  { $grade = 'A-'; $remarks = 'Very Good'; }
+                elseif ($score >= 70)  { $grade = 'B+'; $remarks = 'Good'; }
+                elseif ($score >= 65)  { $grade = 'B'; $remarks = 'Good'; }
+                elseif ($score >= 60)  { $grade = 'B-'; $remarks = 'Fair'; }
+                elseif ($score >= 55)  { $grade = 'C+'; $remarks = 'Fair'; }
+                elseif ($score >= 50)  { $grade = 'C'; $remarks = 'Average'; }
+                elseif ($score >= 45)  { $grade = 'C-'; $remarks = 'Below Average'; }
+                elseif ($score >= 40)  { $grade = 'D+'; $remarks = 'Weak'; }
+                elseif ($score >= 35)  { $grade = 'D'; $remarks = 'Weak'; }
+                elseif ($score >= 30)  { $grade = 'D-'; $remarks = 'Very Weak'; }
+                else                   { $grade = 'E'; $remarks = 'Fail'; }
+
+                // Check if result exists for this student, subject AND exam
+                $check = $conn->prepare("SELECT result_id FROM results WHERE student_id = ? AND subject_id = ? AND exam_id = ? LIMIT 1");
+                $check->bind_param("iii", $student_id, $subject_id, $exam_id);
+                $check->execute();
+                $exists = $check->get_result()->num_rows;
+                $check->close();
+
+                if ($exists > 0) {
+                    $update = $conn->prepare("UPDATE results SET marks = ?, grade = ?, remarks = ?, recorded_by = ? WHERE student_id = ? AND subject_id = ? AND exam_id = ?");
+                    $update->bind_param("dssiiii", $score, $grade, $remarks, $staff_id, $student_id, $subject_id, $exam_id);
+                    $update->execute();
+                    $update->close();
+                } else {
+                    $insert = $conn->prepare("INSERT INTO results (student_id, subject_id, exam_id, marks, grade, remarks, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $insert->bind_param("iiidssi", $student_id, $subject_id, $exam_id, $score, $grade, $remarks, $staff_id);
+                    $insert->execute();
+                    $insert->close();
+                }
+                $saved++;
+            }
+            if ($saved > 0) {
+                $success_msg = "$saved marks saved for $assigned_subject_name ($exam_type).";
+            }
+        }
     }
 }
 
@@ -87,6 +120,15 @@ if ($assigned_form) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) $students[] = $row;
     $stmt->close();
+}
+
+// Fetch available exams to populate the dropdown dynamically
+$exams = [];
+$exam_query = $conn->query("SELECT exam_id, exam_name FROM exams");
+if ($exam_query) {
+    while ($row = $exam_query->fetch_assoc()) {
+        $exams[] = $row;
+    }
 }
 
 $active_page = 'results';
@@ -169,7 +211,7 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
     <?php endif; ?>
     <?php if ($error_msg): ?>
         <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-exclamation-circle-fill me-2"></i> <?php echo htmlspecialchars($error_msg); ?>
+            <i class="bi bi-exclamation-circle-fill me-2"></i> <?php echo $error_msg; ?>
         </div>
     <?php endif; ?>
 
@@ -194,15 +236,26 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
                 <i class="bi bi-info-circle me-2"></i>
                 No students found in <strong><?php echo htmlspecialchars($assigned_form); ?></strong>.
             </div>
+        <?php elseif (empty($exams)): ?>
+            <div class="alert alert-danger rounded-4">
+                <i class="bi bi-exclamation-octagon me-2"></i>
+                <strong>No Exams Found!</strong> You cannot enter results until an Admin creates an exam in the Exams module.
+            </div>
         <?php else: ?>
             <form method="POST">
                 <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Exam Type</label>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Select Exam</label>
                         <select name="exam_type" class="form-select border-0 bg-light rounded-3" required>
-                            <option value="Opener">Opener Exam</option>
-                            <option value="Mid-Term">Mid-Term Exam</option>
-                            <option value="End-Term">End-Term Exam</option>
+                            <option value="" disabled selected>Choose an exam...</option>
+                            <!-- FIX: Added !empty check to prevent null errors -->
+                            <?php foreach ($exams as $exam): ?>
+                                <?php if (!empty($exam['exam_name'])): ?>
+                                    <option value="<?php echo htmlspecialchars($exam['exam_name']); ?>">
+                                        <?php echo htmlspecialchars($exam['exam_name']); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                 </div>

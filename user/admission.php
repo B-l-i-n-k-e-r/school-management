@@ -18,11 +18,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $phone = mysqli_real_escape_string($conn, $_POST['phone']);
     $dob = mysqli_real_escape_string($conn, $_POST['dob']);
-    $gender = mysqli_real_escape_string($conn, $_POST['gender']); // Added Gender
+    $gender = mysqli_real_escape_string($conn, $_POST['gender']); 
     $address = mysqli_real_escape_string($conn, $_POST['address']);
     $form_requested = mysqli_real_escape_string($conn, $_POST['form_requested']);
-    $previous_school = isset($_POST['previous_school']) ? mysqli_real_escape_string($conn, $_POST['previous_school']) : "N/A";
-
+    
     // Check for existing applications or users
     $check_app = mysqli_query($conn, "SELECT id FROM admission_applications WHERE email = '$email' LIMIT 1");
     $check_user = mysqli_query($conn, "SELECT student_id FROM students WHERE email = '$email' LIMIT 1");
@@ -38,9 +37,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
                         You are already enrolled. Please <a href='../login.php' class='alert-link'>Login here</a>.
                     </div>";
     } else {
-        // Updated SQL to include gender
-        $sql = "INSERT INTO admission_applications (student_name, parent_name, email, phone, dob, gender, address, form_requested, previous_school, status) 
-                VALUES ('$student_name', '$parent_name', '$email', '$phone', '$dob', '$gender', '$address', '$form_requested', '$previous_school', 'pending')";
+        // FIXED SQL: Removed 'previous_school' because it doesn't exist in the DB
+        $sql = "INSERT INTO admission_applications (student_name, parent_name, email, phone, dob, gender, address, form_requested, status) 
+                VALUES ('$student_name', '$parent_name', '$email', '$phone', '$dob', '$gender', '$address', '$form_requested', 'pending')";
         
         if (mysqli_query($conn, $sql)) {
             $message = "<div class='alert alert-success border-0 shadow-sm rounded-4 mb-4'>
@@ -61,13 +60,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
     <title>Admission Request | The Michaelson School</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
     
     <style>
        :root {
-             --primary: #000a66;
+            --primary: #000a66;
             --accent: #FFC107;
-            --bg: #f8fafc94;
+            --bg: #f1f5f9;
             --white: #ffffff;
             --text: #334155;
             --text-muted: #64748b; 
@@ -81,29 +80,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
             line-height: 1.6;
         }
 
+        h2 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
         
         .card { 
             border: none; 
             border-radius: 24px; 
             background: var(--white);
-            border-radius: 20px;
             padding: 40px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            border-left: 6px solid var(--primary);
-            transition: transform 0.3s;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
         }
 
         .form-label {
-            color: #475569;
+            color: var(--text);
             margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .form-control, .form-select { 
             border-radius: 12px; 
-            padding: 12px 16px; 
-            border: 1px solid #e2e8f0; 
+            padding: 14px 16px; 
+            border: 1px solid #cbd5e1; 
             transition: all 0.2s;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1);
         }
 
         .btn-admission { 
@@ -111,29 +119,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
             color: white;
             border: none; 
             border-radius: 12px; 
-            padding: 14px; 
+            padding: 16px; 
             font-weight: 700; 
+            font-size: 1.05rem;
             transition: all 0.3s;
         }
 
         .btn-admission:hover {
-            background: #2d99f1;
+            background: #0013a3;
             transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0, 10, 102, 0.4);
             color: white;
-        }
-
-        .back-link {
-            text-decoration: none;
-            color: var(--primary-color);
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            margin-bottom: 2rem;
         }
 
          footer {
             background: var(--primary);
-            color: white;
+            color: #94a3b8;
             text-align: center;
             padding: 30px 20px;
             margin-top: 60px;
@@ -146,28 +147,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
     <div class="row justify-content-center">
         <div class="col-md-10 col-lg-8">
             
-            <div class="card p-4 p-md-5">
-                <div class="text-center mb-4">
-                    <h2 class="fw-bold mb-1">Student Admission Form</h2>
-                    <p class="text-muted">Join the The Michaelson School community</p>
+            <div class="card">
+                <div class="text-center mb-5">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 70px; height: 70px;">
+                        <i class="bi bi-person-plus-fill fs-2" style="color: var(--primary);"></i>
+                    </div>
+                    <h2 class="fw-bold mb-2">Student Admission Form</h2>
+                    <p class="text-muted">Join The Michaelson School community today.</p>
                 </div>
                 
                 <?php echo $message; ?>
 
                 <form method="POST" action="">
                     <div class="row g-4">
+                        <!-- Student Info -->
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Student Full Name</label>
+                            <label class="form-label text-uppercase">Student Full Name</label>
                             <input type="text" name="student_name" class="form-control" placeholder="Full Legal Name" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Date of Birth</label>
+                            <label class="form-label text-uppercase">Date of Birth</label>
                             <input type="date" name="dob" class="form-control" required>
                         </div>
 
-                        <!-- Added Gender Field -->
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Gender</label>
+                            <label class="form-label text-uppercase">Gender</label>
                             <select name="gender" class="form-select" required>
                                 <option value="" selected disabled>Select Gender</option>
                                 <option value="Male">Male</option>
@@ -177,27 +181,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Phone Number</label>
-                            <input type="tel" name="phone" class="form-control" value="+254" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Parent/Guardian Name</label>
-                            <input type="text" name="parent_name" class="form-control" placeholder="Guardian Full Name" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Email Address</label>
-                            <input type="email" name="email" class="form-control" placeholder="example@mail.com" required>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Physical Address</label>
-                            <input type="text" name="address" class="form-control" placeholder="Estate/Town/Street" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold text-uppercase">Desired Standard</label>
+                            <label class="form-label text-uppercase">Desired Standard</label>
                             <select name="form_requested" class="form-select" required>
                                 <option value="" selected disabled>Choose Form...</option>
                                 <option value="Form 1">Form 1</option>
@@ -207,14 +191,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
                             </select>
                         </div>
                         
-                        <div class="col-12">
-                            <label class="form-label small fw-bold text-uppercase">Previous School</label>
-                            <input type="text" name="previous_school" class="form-control" placeholder="Last School Attended">
+                        <div class="col-12 mt-2">
+                            <hr class="text-muted opacity-25">
                         </div>
 
-                        <div class="col-12 mt-4">
-                            <button type="submit" name="submit_application" class="btn btn-admission w-100 shadow-sm">
-                                <i class="bi bi-send-check-fill me-2"></i> Submit My Application
+                        <!-- Parent/Guardian Info -->
+                        <div class="col-md-6">
+                            <label class="form-label text-uppercase">Parent/Guardian Name</label>
+                            <input type="text" name="parent_name" class="form-control" placeholder="Guardian Full Name" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label text-uppercase">Email Address</label>
+                            <input type="email" name="email" class="form-control" placeholder="example@mail.com" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-uppercase">Phone Number</label>
+                            <input type="tel" name="phone" class="form-control" value="+254" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-uppercase">Physical Address</label>
+                            <input type="text" name="address" class="form-control" placeholder="Estate/Town/Street" required>
+                        </div>
+
+                        <div class="col-12 mt-5">
+                            <button type="submit" name="submit_application" class="btn btn-admission w-100">
+                                <i class="bi bi-send-check-fill me-2"></i> Submit Application
                             </button>
                             <p class="text-center small text-muted mt-3">
                               <i> By submitting, you agree to <strong> The Michaelson School</strong> admission policies.</i>
@@ -229,7 +233,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_application']))
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <footer>
-    <p>&copy; 2026 The Michaelson School, Kenya. All Rights Reserved.</p>
+    <p>&copy; <?php echo date('Y'); ?> The Michaelson School, Kenya. All Rights Reserved.</p>
 </footer>
 </body>
 </html>

@@ -27,18 +27,36 @@ if (!$student) {
 }
 
 $student_id = (int) $student['student_id'];
+$student_form = $student['form'] ?? ''; 
 
-// Fetch THIS student's fees only — uses `amount_total`
-$fee_stmt = $conn->prepare("SELECT * FROM fees WHERE student_id = ? LIMIT 1");
-$fee_stmt->bind_param("i", $student_id);
-$fee_stmt->execute();
-$fees = $fee_stmt->get_result()->fetch_assoc();
-$fee_stmt->close();
+// FIXED: Fetch the Fee Structure total for this student's class
+$total_fees = 0;
+$structure_stmt = $conn->prepare("SELECT total_amount FROM fee_structure WHERE form = ? LIMIT 1");
+if ($structure_stmt) {
+    $structure_stmt->bind_param("s", $student_form);
+    $structure_stmt->execute();
+    $structure_res = $structure_stmt->get_result()->fetch_assoc();
+    if ($structure_res) {
+        $total_fees = (float) $structure_res['total_amount'];
+    }
+    $structure_stmt->close();
+}
+
+// Fetch how much THIS student has actually paid
+$amount_paid = 0;
+$fee_stmt = $conn->prepare("SELECT SUM(amount_paid) as total_paid FROM fees WHERE student_id = ?");
+if ($fee_stmt) {
+    $fee_stmt->bind_param("i", $student_id);
+    $fee_stmt->execute();
+    $fee_res = $fee_stmt->get_result()->fetch_assoc();
+    if ($fee_res) {
+        $amount_paid = (float) ($fee_res['total_paid'] ?? 0);
+    }
+    $fee_stmt->close();
+}
 
 // Compute balance
-$total_fees  = (float) ($fees['amount_total'] ?? 0);
-$amount_paid = (float) ($fees['amount_paid']  ?? 0);
-$balance     = $total_fees - $amount_paid;
+$balance = $total_fees - $amount_paid;
 
 $student_display_name = $student['full_name'] ?? 'Student';
 $active_page = 'dashboard';
@@ -158,9 +176,9 @@ $extra_label = 'Student Profile';
                 <div class="info-value"><?php echo htmlspecialchars($student['email'] ?? '—'); ?></div>
             </div>
 
-            <?php if ($fees): ?>
+            <?php if ($total_fees > 0 || $amount_paid > 0): ?>
                 <div class="info-row" style="border-top: 2px solid #e2e8f0; margin-top: 20px; padding-top: 20px;">
-                    <div class="info-label">Total Fees</div>
+                    <div class="info-label">Total Fees (<?php echo htmlspecialchars($student_form); ?>)</div>
                     <div class="info-value">KES <?php echo number_format($total_fees, 2); ?></div>
                 </div>
                 <div class="info-row">

@@ -79,9 +79,15 @@ $extra_label = 'Academic Leave';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
+        :root { 
+            --sidebar-bg: #34445c; 
+            --submenu-bg: #2c3a4d; 
+            --primary-blue: #1a3066; 
+            --sidebar-width: 240px; 
+        }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
+        /* Sidebar */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
         body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
         body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
@@ -99,15 +105,26 @@ $extra_label = 'Academic Leave';
         .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.03em; }
-        .form-control, .form-select { border-radius: 10px; padding: 10px 14px; border: 1px solid #e2e8f0; font-size: 0.9rem; background: #f8fafc; }
-        .form-control:focus, .form-select:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(26,48,102,0.1); background: #fff; }
+        /* --- MODERN UI STYLES --- */
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
+        
+        .form-label { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .form-control, .form-select { border-radius: 12px; padding: 12px 16px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
+        .form-control:focus, .form-select:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
+        
+        .btn-primary { background: var(--primary-blue); border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
+        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
 
-        .status-badge { font-size: 0.7rem; padding: 5px 12px; border-radius: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-        .status-pending  { background: #fef3c7; color: #92400e; }
-        .status-approved { background: #d1fae5; color: #065f46; }
-        .status-rejected { background: #fee2e2; color: #991b1b; }
+        /* Modern Status Pills */
+        .status-badge { font-size: 0.75rem; padding: 6px 14px; border-radius: 50px; font-weight: 800; letter-spacing: 0.03em; display: inline-block; }
+        .status-pending  { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+        .status-approved { background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; }
+        .status-rejected { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+        /* Table Styling */
+        .table th { font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; font-weight: 800; padding: 15px; border-bottom: 2px solid #e2e8f0; }
+        .table td { padding: 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+        .table tbody tr:hover { background-color: #f8fafc; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -116,6 +133,7 @@ $extra_label = 'Academic Leave';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
     </style>
 </head>
@@ -127,31 +145,32 @@ $extra_label = 'Academic Leave';
 <main class="main-content">
 
     <div class="mb-4">
-        <h2 class="fw-bold mb-1">Academic Leave</h2>
+        <h2 class="fw-bold mb-1 text-dark">Academic Leave</h2>
         <p class="text-muted small mb-0">Request a formal temporary suspension of studies</p>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center">
-            <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'info-circle-fill'; ?> me-2"></i>
-            <?php echo htmlspecialchars($message); ?>
+        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
+            <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'info-circle-fill'; ?> me-2 fs-5"></i>
+            <span class="fw-medium"><?php echo htmlspecialchars($message); ?></span>
         </div>
     <?php endif; ?>
 
     <div class="row g-4">
         <!-- Application Form -->
         <div class="col-lg-5">
-            <div class="card p-4 h-100">
-                <h5 class="fw-bold mb-4"><i class="bi bi-pencil-square me-2 text-primary"></i>New Request</h5>
+            <div class="card p-4 p-md-5 h-100 bg-white">
+                <h5 class="fw-bold mb-4 text-dark"><i class="bi bi-pencil-square me-2 text-primary"></i>New Request</h5>
+                
                 <form method="POST">
                     <div class="mb-3">
                         <label class="form-label">Reason for Leave</label>
                         <select name="leave_type" class="form-select" required>
-                            <option value="">Select category...</option>
-                            <option value="Medical">Medical grounds</option>
-                            <option value="Financial">Financial constraints</option>
+                            <option value="" disabled selected>Select a category...</option>
+                            <option value="Medical">Medical Grounds</option>
+                            <option value="Financial">Financial Constraints</option>
                             <option value="Personal">Personal / Compassionate</option>
-                            <option value="Work">Work commitment</option>
+                            <option value="Work">Work Commitment</option>
                         </select>
                     </div>
 
@@ -168,13 +187,11 @@ $extra_label = 'Academic Leave';
 
                     <div class="mb-4">
                         <label class="form-label">Detailed Explanation</label>
-                        <textarea name="reason" class="form-control" rows="4"
-                                  placeholder="Briefly explain your situation..." required></textarea>
+                        <textarea name="reason" class="form-control" rows="4" placeholder="Briefly explain your situation..." required></textarea>
                     </div>
 
-                    <button type="submit" name="apply_leave"
-                            class="btn btn-primary w-100 py-2 fw-bold rounded-3">
-                        <i class="bi bi-send me-2"></i>Submit Application
+                    <button type="submit" name="apply_leave" class="btn btn-primary w-100 shadow-sm">
+                        <i class="bi bi-send-fill me-2"></i>Submit Application
                     </button>
                 </form>
             </div>
@@ -182,24 +199,27 @@ $extra_label = 'Academic Leave';
 
         <!-- History -->
         <div class="col-lg-7">
-            <div class="card p-4 h-100">
+            <div class="card p-4 p-md-5 h-100 bg-white">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Application History</h5>
-                    <span class="badge rounded-pill bg-light text-dark border">
-                        <?php echo count($leave_history); ?> request<?php echo count($leave_history) === 1 ? '' : 's'; ?>
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history me-2 text-primary"></i>Application History</h5>
+                    <span class="badge rounded-pill bg-light text-secondary border px-3 py-2">
+                        <?php echo count($leave_history); ?> Request<?php echo count($leave_history) === 1 ? '' : 's'; ?>
                     </span>
                 </div>
 
                 <?php if (empty($leave_history)): ?>
                     <div class="text-center py-5">
-                        <i class="bi bi-calendar-x fs-1 text-muted d-block mb-3"></i>
-                        <p class="text-muted mb-0">No previous leave requests found.</p>
+                        <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-calendar-x fs-1 text-muted"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark">No requests found</h6>
+                        <p class="text-muted small mb-0">You haven't submitted any leave requests yet.</p>
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead class="bg-light">
-                                <tr class="small text-muted fw-bold text-uppercase">
+                                <tr>
                                     <th>Type</th>
                                     <th>Duration</th>
                                     <th>Status</th>
@@ -209,13 +229,13 @@ $extra_label = 'Academic Leave';
                             <tbody>
                                 <?php foreach ($leave_history as $leave): ?>
                                     <tr>
-                                        <td class="fw-bold"><?php echo htmlspecialchars($leave['leave_type'] ?? ''); ?></td>
+                                        <td class="fw-bold text-dark"><?php echo htmlspecialchars($leave['leave_type'] ?? ''); ?></td>
                                         <td>
-                                            <small class="text-muted d-block">
-                                                From: <?php echo !empty($leave['start_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['start_date']))) : '—'; ?>
+                                            <small class="text-muted d-block fw-medium">
+                                                <i class="bi bi-calendar-event me-1"></i> <?php echo !empty($leave['start_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['start_date']))) : '—'; ?>
                                             </small>
-                                            <small class="text-muted d-block">
-                                                To: <?php echo !empty($leave['end_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['end_date']))) : '—'; ?>
+                                            <small class="text-muted d-block fw-medium mt-1">
+                                                <i class="bi bi-calendar-check me-1"></i> <?php echo !empty($leave['end_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['end_date']))) : '—'; ?>
                                             </small>
                                         </td>
                                         <td>
@@ -224,7 +244,7 @@ $extra_label = 'Academic Leave';
                                             </span>
                                         </td>
                                         <td>
-                                            <small class="text-muted">
+                                            <small class="text-muted fw-medium">
                                                 <?php echo !empty($leave['created_at']) ? htmlspecialchars(date('d M Y', strtotime($leave['created_at']))) : '—'; ?>
                                             </small>
                                         </td>
