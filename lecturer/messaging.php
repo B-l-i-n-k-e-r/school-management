@@ -12,47 +12,89 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
 }
 
 $staff_id = (int) $_SESSION['user_id'];
-$staff_query = $conn->query("SELECT full_name, email FROM teachers WHERE teacher_id = $staff_id");
+$staff_query = $conn->query("SELECT full_name, email, assigned_form FROM teachers WHERE teacher_id = $staff_id");
 $staff_data = $staff_query->fetch_assoc() ?: [];
 $staff_name = $staff_data['full_name'] ?? 'Staff';
 $staff_email = $staff_data['email'] ?? '';
+$assigned_form = $staff_data['assigned_form'] ?? '';
 
 $success_msg = '';
 $error_msg   = '';
 
-// Handle sending a new message to Admin
+// Handle sending a new message
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
-    $subject = trim($_POST['subject'] ?? '');
-    $content = trim($_POST['content'] ?? '');
+    $recipient_type = $_POST['recipient_type'] ?? 'admin';
+    $audience_type  = $_POST['audience_type'] ?? 'single';
+    $student_id     = (int) ($_POST['student_id'] ?? 0);
+    $subject        = trim($_POST['subject'] ?? '');
+    $content        = trim($_POST['content'] ?? '');
 
     if (empty($subject) || empty($content)) {
         $error_msg = "Please fill in both the subject and the message.";
+    } elseif ($recipient_type === 'student' && $audience_type === 'single' && $student_id <= 0) {
+        $error_msg = "Please select a specific student.";
+    } elseif ($recipient_type === 'student' && $audience_type === 'all' && empty($assigned_form)) {
+        $error_msg = "You need an assigned class to message all students.";
     } else {
-        // Insert into the shared messages table
-        $stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, 0)");
-        $stmt->bind_param("ssss", $staff_name, $staff_email, $subject, $content);
-        
-        if ($stmt->execute()) {
-            $success_msg = "Message sent to Admin successfully!";
+        if ($recipient_type === 'admin') {
+            $stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, 0)");
+            $stmt->bind_param("ssss", $staff_name, $staff_email, $subject, $content);
+            if ($stmt->execute()) $success_msg = "Message sent to Admin successfully!";
+            else $error_msg = "Error sending message: " . $stmt->error;
+            $stmt->close();
         } else {
-            $error_msg = "Error sending message: " . $stmt->error;
+            if ($audience_type === 'single') {
+                $st_lookup = $conn->prepare("SELECT email, full_name FROM students WHERE student_id = ? LIMIT 1");
+                $st_lookup->bind_param("i", $student_id);
+                $st_lookup->execute();
+                $st_data = $st_lookup->get_result()->fetch_assoc();
+                $st_lookup->close();
+                
+                $recipient_email = $st_data['email'] ?? '';
+                
+                if (!empty($recipient_email)) {
+                    $stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, recipient_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, ?, 0)");
+                    $stmt->bind_param("sssss", $staff_name, $staff_email, $recipient_email, $subject, $content);
+                    if ($stmt->execute()) $success_msg = "Message sent to student successfully!";
+                    else $error_msg = "Error: " . $stmt->error;
+                    $stmt->close();
+                } else {
+                    $error_msg = "Could not find the student's email address.";
+                }
+            } else {
+                $st_lookup = $conn->prepare("SELECT email FROM students WHERE form = ? AND email IS NOT NULL AND email != ''");
+                $st_lookup->bind_param("s", $assigned_form);
+                $st_lookup->execute();
+                $st_res = $st_lookup->get_result();
+                
+                $count = 0;
+                $stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, recipient_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, ?, 0)");
+                
+                while ($st = $st_res->fetch_assoc()) {
+                    $recipient_email = $st['email'];
+                    $stmt->bind_param("sssss", $staff_name, $staff_email, $recipient_email, $subject, $content);
+                    if ($stmt->execute()) $count++;
+                }
+                $stmt->close();
+                $st_lookup->close();
+                
+                if ($count > 0) $success_msg = "Message broadcasted to $count students in $assigned_form!";
+                else $error_msg = "No students with valid emails found in your class.";
+            }
         }
-        $stmt->close();
     }
 }
 
 // Fetch Announcements for Staff
 $announcements = [];
-// We look for notices targeted to 'Staff' or 'Both'
 $stmt = $conn->prepare("SELECT * FROM notices WHERE target_audience IN ('Staff', 'Both') ORDER BY created_at DESC LIMIT 5");
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) $announcements[] = $row;
 $stmt->close();
 
-// Fetch Message History between this teacher and Admin
+// Fetch Message History
 $messages = [];
-// We match by the teacher's email or name
 $stmt = $conn->prepare("SELECT * FROM messages WHERE sender_email = ? ORDER BY created_at DESC");
 $stmt->bind_param("s", $staff_email);
 $stmt->execute();
@@ -60,6 +102,18 @@ $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) $messages[] = $row;
 $stmt->close();
 
+// Fetch Students
+$students = [];
+if (!empty($assigned_form)) {
+    $stmt = $conn->prepare("SELECT student_id, full_name, adm_no FROM students WHERE form = ? ORDER BY full_name ASC");
+    $stmt->bind_param("s", $assigned_form);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) $students[] = $row;
+    $stmt->close();
+}
+
+$staff_display_name = $staff_name;
 $active_page = 'messaging';
 $extra_label = 'Communication Center';
 ?>
@@ -81,7 +135,7 @@ $extra_label = 'Communication Center';
         }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        /* Sidebar Styles */
+        /* Sidebar */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
@@ -96,16 +150,18 @@ $extra_label = 'Communication Center';
         .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
         .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
         .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
+
+        /* Main Content */
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
+
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
 
-        /* Component Styles */
+        /* Cards */
         .modern-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 30px; }
         .form-label { font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
-        .form-control { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; background-color: #f8fafc; transition: all 0.2s; }
-        .form-control:focus { box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12); border-color: var(--primary-blue); background: #fff; }
+        .form-control, .form-select { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; background-color: #f8fafc; transition: all 0.2s; }
+        .form-control:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12); border-color: var(--primary-blue); background: #fff; }
         .btn-primary { background: var(--primary-blue); border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
         .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
 
@@ -140,7 +196,7 @@ $extra_label = 'Communication Center';
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h2 class="fw-bold mb-1">Communication Center</h2>
-            <p class="text-muted small mb-0">Read announcements and communicate directly with the administration.</p>
+            <p class="text-muted small mb-0">Read announcements and send messages to Admin or Students.</p>
         </div>
     </div>
 
@@ -186,7 +242,6 @@ $extra_label = 'Communication Center';
                                 <h6 class="fw-bold mb-1"><?php echo htmlspecialchars($not['title']); ?></h6>
                                 <div class="text-muted small" style="line-height: 1.5;">
                                     <?php 
-                                        // FIX: Strip HTML tags for the preview so CKEditor formatting doesn't break the layout
                                         $clean_content = strip_tags($not['content']);
                                         $preview = substr($clean_content, 0, 150);
                                         echo htmlspecialchars($preview) . (strlen($clean_content) > 150 ? '...' : ''); 
@@ -202,25 +257,64 @@ $extra_label = 'Communication Center';
         <!-- Right Side: Messaging -->
         <div class="col-lg-7">
             <div class="modern-card h-100">
-                <h5 class="fw-bold mb-4"><i class="bi bi-chat-dots-fill me-2" style="color: var(--primary-blue);"></i>Message Administration</h5>
+                <h5 class="fw-bold mb-4"><i class="bi bi-chat-dots-fill me-2" style="color: var(--primary-blue);"></i>Send a Message</h5>
 
                 <!-- Send Form -->
                 <form method="POST" class="mb-5 p-4 rounded-4" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                    
+                    <!-- Recipient Type Toggle -->
+                    <div class="mb-3">
+                        <label class="form-label">Send To</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="recipient_type" id="send_admin" value="admin" checked onchange="toggleRecipientOptions()">
+                                <label class="form-check-label fw-bold" for="send_admin">Administration</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="recipient_type" id="send_student" value="student" onchange="toggleRecipientOptions()">
+                                <label class="form-check-label fw-bold" for="send_student">Student(s)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student Audience Options (Hidden by default) -->
+                    <div class="mb-3 d-none" id="studentOptionsDiv">
+                        <label class="form-label">Message Audience</label>
+                        <select name="audience_type" id="audience_type" class="form-select mb-2" onchange="toggleSingleStudent()">
+                            <option value="all">All Students in <?php echo htmlspecialchars($assigned_form ?: 'my class'); ?></option>
+                            <option value="single">A Specific Student</option>
+                        </select>
+
+                        <!-- Specific Student Dropdown (Hidden by default) -->
+                        <div class="d-none" id="singleStudentDiv">
+                            <select name="student_id" id="student_id" class="form-select">
+                                <option value="" disabled selected>-- Choose Student --</option>
+                                <?php foreach ($students as $st): ?>
+                                    <option value="<?php echo $st['student_id']; ?>">
+                                        <?php echo htmlspecialchars($st['full_name'] . ' (' . $st['adm_no'] . ')'); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Subject</label>
-                        <input type="text" name="subject" class="form-control" placeholder="e.g., Request for teaching materials" required>
+                        <input type="text" name="subject" class="form-control" placeholder="e.g., Homework update or Exam reminder" required>
                     </div>
+                    
                     <div class="mb-3">
                         <label class="form-label">Message</label>
-                        <textarea name="content" class="form-control" rows="3" placeholder="Type your message to the Admin here..." required></textarea>
+                        <textarea name="content" class="form-control" rows="3" placeholder="Type your message here..." required></textarea>
                     </div>
+                    
                     <button type="submit" name="send_message" class="btn btn-primary w-100">
-                        <i class="bi bi-send-fill me-2"></i> Send to Admin
+                        <i class="bi bi-send-fill me-2"></i> Send Message
                     </button>
                 </form>
 
                 <!-- Message History -->
-                <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.8rem; letter-spacing: 1px;">Message History</h6>
+                <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.8rem; letter-spacing: 1px;">Recent Sent Messages</h6>
                 
                 <?php if (empty($messages)): ?>
                     <div class="text-center py-4">
@@ -294,6 +388,34 @@ $extra_label = 'Communication Center';
             if (icon) icon.classList.replace(isClosed ? 'bi-plus' : 'bi-dash', isClosed ? 'bi-dash' : 'bi-plus');
         });
     });
+
+    // --- RECIPIENT TOGGLE LOGIC ---
+    function toggleRecipientOptions() {
+        const isStudent = document.getElementById('send_student').checked;
+        const studentOptionsDiv = document.getElementById('studentOptionsDiv');
+        
+        if (isStudent) {
+            studentOptionsDiv.classList.remove('d-none');
+        } else {
+            studentOptionsDiv.classList.add('d-none');
+            document.getElementById('audience_type').value = 'all';
+            toggleSingleStudent();
+        }
+    }
+
+    function toggleSingleStudent() {
+        const audienceType = document.getElementById('audience_type').value;
+        const singleStudentDiv = document.getElementById('singleStudentDiv');
+        const studentSelect = document.getElementById('student_id');
+
+        if (audienceType === 'single') {
+            singleStudentDiv.classList.remove('d-none');
+            studentSelect.required = true;
+        } else {
+            singleStudentDiv.classList.add('d-none');
+            studentSelect.required = false;
+        }
+    }
 </script>
 </body>
 </html>

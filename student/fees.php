@@ -26,7 +26,7 @@ if (!$student) {
 
 $student_id = (int) $student['student_id'];
 
-// Fetch fee record — uses `amount_total`
+// Fetch fee record
 $fee_stmt = $conn->prepare("SELECT * FROM fees WHERE student_id = ? LIMIT 1");
 $fee_stmt->bind_param("i", $student_id);
 $fee_stmt->execute();
@@ -82,6 +82,7 @@ $extra_label = 'Fee Balance';
         }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
+        /* Sidebar */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
@@ -104,32 +105,47 @@ $extra_label = 'Fee Balance';
 
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
+        /* Modern Cards */
+        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); background: white; }
+        
+        /* Hero Section */
         .balance-hero {
-            border-radius: 20px; padding: 36px 40px; color: white; position: relative; overflow: hidden;
-            box-shadow: 0 10px 30px -10px rgba(15,39,68,0.35);
+            border-radius: 24px; padding: 40px; color: white; position: relative; overflow: hidden;
+            box-shadow: 0 15px 35px -10px rgba(15,39,68,0.3);
         }
         .balance-hero.paid    { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
         .balance-hero.owing   { background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%); }
         .balance-hero.partial { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
         .balance-hero.none    { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
-        .balance-hero::after {
-            content: ''; position: absolute; right: -60px; top: -60px;
-            width: 220px; height: 220px; border-radius: 50%;
-            background: rgba(255,255,255,0.08);
+        
+        /* Decorative circles */
+        .balance-hero::before, .balance-hero::after {
+            content: ''; position: absolute; border-radius: 50%; background: rgba(255,255,255,0.08);
         }
-        .balance-hero .amount { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
-        .balance-hero .label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.85; }
+        .balance-hero::before { width: 300px; height: 300px; top: -100px; right: -50px; }
+        .balance-hero::after { width: 150px; height: 150px; bottom: -50px; left: 10%; }
+
+        .balance-hero .amount { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+        .balance-hero .label { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.9; }
 
         .mini-stat {
             background: rgba(255,255,255,0.15);
             border: 1px solid rgba(255,255,255,0.2);
-            backdrop-filter: blur(6px);
-            border-radius: 14px;
-            padding: 14px 18px;
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 16px 20px;
         }
 
-        .progress { height: 10px; border-radius: 6px; background: #e2e8f0; }
-        .progress-bar { border-radius: 6px; }
+        /* Modern Progress Bar */
+        .progress { height: 12px; border-radius: 10px; background: #e2e8f0; overflow: hidden; }
+        .progress-bar { border-radius: 10px; }
+
+        /* Table Styling */
+        .table th { font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; font-weight: 800; padding: 18px 15px; border-bottom: 2px solid #e2e8f0; }
+        .table td { padding: 18px 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+        .table tbody tr:hover { background-color: #f8fafc; }
+
+        .amount-pill { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 50px; font-weight: 800; font-size: 0.95rem; display: inline-block; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -138,10 +154,11 @@ $extra_label = 'Fee Balance';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
         @media (max-width: 576px) {
-            .balance-hero { padding: 26px 24px; }
-            .balance-hero .amount { font-size: 2rem; }
+            .balance-hero { padding: 30px 20px; }
+            .balance-hero .amount { font-size: 2.2rem; }
         }
     </style>
 </head>
@@ -154,7 +171,7 @@ $extra_label = 'Fee Balance';
 
     <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
         <div>
-            <h2 class="fw-bold mb-1">Fee Balance</h2>
+            <h2 class="fw-bold mb-1 text-dark">Fee Balance</h2>
             <p class="text-muted small mb-0">
                 <strong><?php echo htmlspecialchars($student_display_name); ?></strong>
                 &middot; <?php echo htmlspecialchars($student['adm_no'] ?? ''); ?>
@@ -163,11 +180,12 @@ $extra_label = 'Fee Balance';
                 <?php endif; ?>
             </p>
         </div>
-        <a href="receipts.php" class="btn btn-outline-primary rounded-3 px-4 shadow-sm">
+        <a href="receipts.php" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
             <i class="bi bi-receipt me-2"></i>View Receipts
         </a>
     </div>
 
+    <!-- Hero Banner -->
     <div class="balance-hero <?php
         if ($has_no_record)       echo 'none';
         elseif ($is_paid_off)     echo 'paid';
@@ -228,11 +246,12 @@ $extra_label = 'Fee Balance';
         </div>
     </div>
 
+    <!-- Progress Bar Section -->
     <?php if (!$has_no_record): ?>
-        <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+        <div class="card p-4 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="fw-bold small text-muted text-uppercase">Payment Progress</span>
-                <span class="fw-bold"><?php echo $paid_pct; ?>%</span>
+                <span class="fw-bold small text-muted text-uppercase" style="letter-spacing: 0.05em;">Payment Progress</span>
+                <span class="fw-bold fs-5 text-dark"><?php echo $paid_pct; ?>%</span>
             </div>
             <div class="progress">
                 <div class="progress-bar <?php echo $paid_pct >= 100 ? 'bg-success' : ($paid_pct >= 50 ? 'bg-primary' : 'bg-warning'); ?>"
@@ -243,46 +262,47 @@ $extra_label = 'Fee Balance';
                      aria-valuemax="100">
                 </div>
             </div>
-            <div class="d-flex justify-content-between mt-2">
-                <small class="text-muted">KES <?php echo number_format($amount_paid, 2); ?> paid</small>
-                <small class="text-muted">KES <?php echo number_format($total_fees, 2); ?> total</small>
+            <div class="d-flex justify-content-between mt-3">
+                <small class="text-muted fw-medium"><i class="bi bi-check2-circle me-1 text-success"></i> KES <?php echo number_format($amount_paid, 2); ?> paid</small>
+                <small class="text-muted fw-medium"><i class="bi bi-wallet2 me-1 text-primary"></i> KES <?php echo number_format($total_fees, 2); ?> total</small>
             </div>
         </div>
     <?php else: ?>
-        <div class="alert alert-info border-0 shadow-sm rounded-4 p-4 mb-4">
-            <div class="d-flex align-items-start gap-3">
-                <i class="bi bi-info-circle-fill fs-4"></i>
-                <div>
-                    <h6 class="fw-bold mb-1">No fee record on file</h6>
-                    <p class="mb-0 small">
-                        A fee record hasn't been created for your account yet.
-                        Please contact the finance office if this is incorrect.
-                    </p>
-                </div>
+        <!-- Empty state card -->
+        <div class="card p-4 p-md-5 mb-4 text-center">
+            <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                <i class="bi bi-info-circle fs-1 text-muted"></i>
             </div>
+            <h5 class="fw-bold text-dark">No Fee Record on File</h5>
+            <p class="text-muted mb-0 mx-auto" style="max-width: 500px;">
+                A fee record hasn't been created for your account yet. Please contact the finance office if you believe this is an error.
+            </p>
         </div>
     <?php endif; ?>
 
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-        <div class="card-header bg-white py-3 px-4 border-0 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold">Payment History</h5>
-            <span class="badge rounded-pill bg-light text-dark border">
-                <?php echo count($payments); ?> record<?php echo count($payments) === 1 ? '' : 's'; ?>
+    <!-- Payment History Table -->
+    <div class="card">
+        <div class="card-header bg-white py-4 px-4 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-clock-history me-2 text-primary"></i>Payment History</h5>
+            <span class="badge rounded-pill bg-light text-secondary border px-3 py-2">
+                <?php echo count($payments); ?> Record<?php echo count($payments) === 1 ? '' : 's'; ?>
             </span>
         </div>
 
         <?php if (empty($payments)): ?>
             <div class="p-5 text-center">
-                <i class="bi bi-receipt fs-1 text-muted d-block mb-3"></i>
-                <p class="text-muted mb-0">No payment records yet.</p>
-                <small class="text-muted">Once payments are recorded, they'll appear here.</small>
+                <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                    <i class="bi bi-receipt fs-1 text-muted"></i>
+                </div>
+                <h6 class="fw-bold text-dark">No payments yet</h6>
+                <p class="text-muted small mb-0">Once payments are recorded by the finance office, they will appear here.</p>
             </div>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table align-middle mb-0">
                     <thead class="bg-light">
-                        <tr class="small fw-bold text-muted text-uppercase">
-                            <th class="ps-4 py-3">Date</th>
+                        <tr>
+                            <th class="ps-4">Date</th>
                             <th>Reference</th>
                             <th>Description</th>
                             <th>Method</th>
@@ -292,33 +312,35 @@ $extra_label = 'Fee Balance';
                     <tbody>
                         <?php foreach ($payments as $p): ?>
                             <tr>
-                                <td class="ps-4">
+                                <td class="ps-4 fw-medium text-dark">
                                     <?php echo !empty($p['payment_date']) ? htmlspecialchars(date('d M Y', strtotime($p['payment_date']))) : '—'; ?>
                                 </td>
                                 <td>
                                     <?php if (!empty($p['reference'])): ?>
-                                        <span class="badge bg-light text-dark border">#<?php echo htmlspecialchars($p['reference']); ?></span>
+                                        <span class="badge bg-light text-secondary border">#<?php echo htmlspecialchars($p['reference']); ?></span>
                                     <?php else: ?>
                                         <span class="text-muted small">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo htmlspecialchars($p['notes'] ?: 'Fee payment'); ?></td>
+                                <td class="fw-medium"><?php echo htmlspecialchars($p['notes'] ?: 'Fee Payment'); ?></td>
                                 <td>
                                     <span class="badge rounded-pill
                                         <?php
                                             $m = strtolower($p['method'] ?? 'cash');
                                             echo match(true) {
-                                                str_contains($m, 'mpesa') || str_contains($m, 'm-pesa') => 'bg-success-subtle text-success',
-                                                $m === 'cash'                                        => 'bg-primary-subtle text-primary',
-                                                str_contains($m, 'bank')                             => 'bg-info-subtle text-info',
-                                                default                                              => 'bg-secondary-subtle text-secondary',
+                                                str_contains($m, 'mpesa') || str_contains($m, 'm-pesa') => 'bg-success-subtle text-success border border-success-subtle',
+                                                $m === 'cash'                                        => 'bg-primary-subtle text-primary border border-primary-subtle',
+                                                str_contains($m, 'bank')                             => 'bg-info-subtle text-info border border-info-subtle',
+                                                default                                              => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
                                             };
                                         ?> px-3 py-2">
                                         <?php echo htmlspecialchars($p['method'] ?: 'Cash'); ?>
                                     </span>
                                 </td>
-                                <td class="text-end pe-4 fw-bold text-success">
-                                    KES <?php echo number_format((float)$p['amount'], 2); ?>
+                                <td class="text-end pe-4">
+                                    <span class="amount-pill">
+                                        KES <?php echo number_format((float)$p['amount'], 2); ?>
+                                    </span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

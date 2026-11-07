@@ -21,7 +21,7 @@ $stmt->close();
 
 if (!$student) die("Student record not found.");
 
-// Fetch downloads
+// Fetch Admin-uploaded downloads
 $files = [];
 $d_stmt = $conn->query("SELECT * FROM downloads ORDER BY category ASC, created_at DESC");
 if ($d_stmt) {
@@ -37,11 +37,11 @@ foreach ($files as $f) {
 function file_icon($type) {
     $t = strtolower($type ?? '');
     return match(true) {
-        str_contains($t, 'pdf')                  => 'file-earmark-pdf text-danger',
-        str_contains($t, 'zip') || str_contains($t, 'rar') => 'file-earmark-zip text-warning',
-        str_contains($t, 'doc')                  => 'file-earmark-word text-primary',
-        str_contains($t, 'xls')                  => 'file-earmark-excel text-success',
-        default                                  => 'file-earmark-text text-secondary',
+        str_contains($t, 'pdf')                  => 'file-earmark-pdf-fill text-danger',
+        str_contains($t, 'zip') || str_contains($t, 'rar') => 'file-earmark-zip-fill text-warning',
+        str_contains($t, 'doc')                  => 'file-earmark-word-fill text-primary',
+        str_contains($t, 'xls')                  => 'file-earmark-excel-fill text-success',
+        default                                  => 'file-earmark-text-fill text-secondary',
     };
 }
 
@@ -79,10 +79,20 @@ $extra_label = 'Downloads';
         .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .file-card { border: none; border-radius: 16px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; }
-        .file-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.08); }
-        .icon-box { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; background: #f8fafc; }
-        .category-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; border-radius: 50px; font-weight: 800; }
+        .file-card { border: none; border-radius: 20px; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+        .file-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.08); }
+        
+        .icon-box { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: #f8fafc; }
+        .category-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border-radius: 50px; font-weight: 800; }
+
+        .sys-card { background: linear-gradient(135deg, #1a3066 0%, #2d4a8a 100%); color: white; border-radius: 20px; padding: 25px; height: 100%; display: flex; flex-direction: column; position: relative; overflow: hidden; text-decoration: none; }
+        .sys-card::after { content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: rgba(255,255,255,0.05); border-radius: 50%; }
+        .sys-card:hover { color: white; transform: translateY(-5px); box-shadow: 0 12px 25px rgba(26, 48, 102, 0.3); }
+        .sys-icon { font-size: 2rem; margin-bottom: 15px; color: #fbbf24; }
+
+        .search-box { max-width: 350px; width: 100%; }
+        .search-box input { border-radius: 50px 0 0 50px; padding-left: 20px; border: 1px solid #cbd5e1; }
+        .search-box .input-group-text { border-radius: 0 50px 50px 0; border-left: none; border-color: #cbd5e1; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -91,6 +101,7 @@ $extra_label = 'Downloads';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
     </style>
 </head>
@@ -101,34 +112,101 @@ $extra_label = 'Downloads';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div class="d-flex justify-content-between align-items-start mb-5 flex-wrap gap-3">
         <div>
-            <h2 class="fw-bold mb-1">Student Resources</h2>
-            <p class="text-muted small mb-0">Course outlines, past papers, and institutional forms</p>
+            <h2 class="fw-bold mb-1 text-dark">Student Resources</h2>
+            <p class="text-muted small mb-0">Download official documents, forms, and study materials</p>
         </div>
-        <div class="input-group shadow-sm" style="max-width: 320px;">
-            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <div class="input-group search-box shadow-sm">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
             <input type="text" id="fileSearch" class="form-control border-start-0" placeholder="Search resources...">
         </div>
     </div>
 
+    <!-- SECTION 1: System Generated Documents -->
+    <div class="mb-5">
+        <h5 class="fw-bold mb-3 text-uppercase small text-muted" style="letter-spacing: 0.1em;">
+            <i class="bi bi-cpu-fill me-2 text-primary"></i>System Generated Documents
+        </h5>
+        <div class="row g-4">
+            
+            <!-- Exam Card -->
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="sys-card">
+                    <i class="bi bi-person-vcard-fill sys-icon"></i>
+                    <h6 class="fw-bold mb-1 mt-auto">Exam Card</h6>
+                    <small class="text-white-50 mb-3">Official exam pass</small>
+                    <a href="print_document.php?type=exam_card" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
+                        <i class="bi bi-download me-1"></i> Download
+                    </a>
+                </div>
+            </div>
+
+            <!-- Timetable -->
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="sys-card">
+                    <i class="bi bi-calendar3 sys-icon"></i>
+                    <h6 class="fw-bold mb-1 mt-auto">Class Timetable</h6>
+                    <small class="text-white-50 mb-3">Weekly class schedule</small>
+                    <a href="print_document.php?type=timetable" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
+                        <i class="bi bi-download me-1"></i> Download
+                    </a>
+                </div>
+            </div>
+
+            <!-- Fee Structure -->
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="sys-card">
+                    <i class="bi bi-list-columns-reverse sys-icon"></i>
+                    <h6 class="fw-bold mb-1 mt-auto">Fee Structure</h6>
+                    <small class="text-white-50 mb-3">Expected fees breakdown</small>
+                    <a href="print_document.php?type=fee_structure" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
+                        <i class="bi bi-download me-1"></i> Download
+                    </a>
+                </div>
+            </div>
+
+            <!-- Fee Statement -->
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="sys-card">
+                    <i class="bi bi-receipt-cutoff sys-icon"></i>
+                    <h6 class="fw-bold mb-1 mt-auto">Fee Statement</h6>
+                    <small class="text-white-50 mb-3">Financial statement</small>
+                    <a href="print_document.php?type=fees" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
+                        <i class="bi bi-download me-1"></i> Download
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- SECTION 2: Uploaded Study Materials -->
     <?php if (empty($files)): ?>
-        <div class="card p-5 text-center">
-            <i class="bi bi-folder2-open fs-1 text-muted d-block mb-3"></i>
-            <h5 class="fw-bold text-muted">No resources available</h5>
-            <p class="text-muted mb-0">Check back later — the school will post downloadable material here.</p>
+        <div class="card p-5 text-center mt-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                <i class="bi bi-folder2-open fs-1 text-muted"></i>
+            </div>
+            <h5 class="fw-bold text-dark">No resources uploaded</h5>
+            <p class="text-muted mb-0">The administration has not posted any downloadable files yet.</p>
         </div>
     <?php else: ?>
+        <h5 class="fw-bold mb-3 text-uppercase small text-muted" style="letter-spacing: 0.1em;">
+            <i class="bi bi-folder-fill me-2 text-primary"></i>School Resources
+        </h5>
+        
         <?php foreach ($grouped as $category => $category_files): ?>
             <div class="mb-5">
-                <h5 class="fw-bold mb-3 text-uppercase small text-muted" style="letter-spacing: 0.1em;">
-                    <i class="bi bi-folder-fill me-2 text-primary"></i><?php echo htmlspecialchars($category); ?>
-                </h5>
+                <div class="d-flex align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-dark fs-5"><?php echo htmlspecialchars($category); ?></h6>
+                    <span class="badge bg-light text-secondary border ms-3 px-3 py-1"><?php echo count($category_files); ?> files</span>
+                </div>
+                
                 <div class="row g-4">
                     <?php foreach ($category_files as $file): ?>
                         <div class="col-md-6 col-lg-4 file-item">
-                            <div class="file-card p-3 h-100 d-flex flex-column">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="file-card p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-4">
                                     <div class="icon-box">
                                         <i class="bi bi-<?php echo file_icon($file['file_type']); ?>"></i>
                                     </div>
@@ -136,15 +214,17 @@ $extra_label = 'Downloads';
                                         <?php echo htmlspecialchars($file['file_type'] ?: 'FILE'); ?>
                                     </span>
                                 </div>
-                                <h6 class="fw-bold mb-1 text-truncate"><?php echo htmlspecialchars($file['title'] ?? ''); ?></h6>
-                                <p class="small text-muted mb-3">
-                                    <?php echo htmlspecialchars($file['file_size'] ?? '—'); ?>
-                                    &middot; <?php echo !empty($file['created_at']) ? htmlspecialchars(date('M d, Y', strtotime($file['created_at']))) : '—'; ?>
+                                <h6 class="fw-bold mb-2 text-dark text-truncate" title="<?php echo htmlspecialchars($file['title'] ?? ''); ?>">
+                                    <?php echo htmlspecialchars($file['title'] ?? ''); ?>
+                                </h6>
+                                <p class="small text-muted mb-4">
+                                    <i class="bi bi-hdd me-1"></i><?php echo htmlspecialchars($file['file_size'] ?? '—'); ?>
+                                    &middot; <i class="bi bi-calendar3 me-1"></i><?php echo !empty($file['created_at']) ? htmlspecialchars(date('M d, Y', strtotime($file['created_at']))) : '—'; ?>
                                 </p>
                                 <a href="<?php echo htmlspecialchars($file['file_path'] ?? '#'); ?>"
-                                   class="btn btn-outline-primary btn-sm w-100 fw-bold rounded-3 mt-auto"
+                                   class="btn btn-primary w-100 fw-bold rounded-pill mt-auto"
                                    download>
-                                    <i class="bi bi-download me-2"></i>Download
+                                    <i class="bi bi-download me-2"></i>Download File
                                 </a>
                             </div>
                         </div>

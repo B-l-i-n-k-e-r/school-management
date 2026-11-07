@@ -23,79 +23,45 @@ $staff_display_name = $user_data['full_name'] ?? 'Staff';
 $success_msg = '';
 $error_msg   = '';
 
-// ---- Handle profile update (phone + email) ----
+// ---- Handle profile update (phone only, email is read-only) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $new_email = trim($_POST['email'] ?? '');
     $new_phone = trim($_POST['phone'] ?? '');
 
-    if ($new_email !== '' && !filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
-        $error_msg = 'Please enter a valid email address.';
+    $upd = $conn->prepare("UPDATE teachers SET phone = ? WHERE teacher_id = ?");
+    $upd->bind_param("si", $new_phone, $staff_id);
+    if ($upd->execute()) {
+        $success_msg = 'Phone number updated successfully.';
+        // Refresh
+        $user_data['phone'] = $new_phone;
     } else {
-        $upd = $conn->prepare("UPDATE teachers SET email = ?, phone = ? WHERE teacher_id = ?");
-        $upd->bind_param("ssi", $new_email, $new_phone, $staff_id);
-        if ($upd->execute()) {
-            // Also sync the users table by user_id
-            if (!empty($user_data['user_id'])) {
-                $upd_u = $conn->prepare("UPDATE users SET email = ? WHERE user_id = ?");
-                $upd_u->bind_param("si", $new_email, $user_data['user_id']);
-                $upd_u->execute();
-                $upd_u->close();
-            }
-            $success_msg = 'Profile updated successfully.';
-            // Refresh
-            $user_data['email'] = $new_email;
-            $user_data['phone'] = $new_phone;
-        } else {
-            $error_msg = 'Failed to update profile.';
-        }
-        $upd->close();
+        $error_msg = 'Failed to update profile.';
     }
+    $upd->close();
 }
 
-// ---- Handle password change ----
+// ---- Handle password change (No current password required) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
-    $current  = $_POST['current_password'] ?? '';
     $new_pw   = $_POST['new_password'] ?? '';
     $confirm  = $_POST['confirm_password'] ?? '';
 
-    if ($current === '' || $new_pw === '' || $confirm === '') {
+    if ($new_pw === '' || $confirm === '') {
         $error_msg = 'All password fields are required.';
     } elseif ($new_pw !== $confirm) {
         $error_msg = 'New passwords do not match.';
     } elseif (strlen($new_pw) < 6) {
         $error_msg = 'New password must be at least 6 characters.';
     } else {
-        // Fetch current hash from users table
         $user_id = (int) ($user_data['user_id'] ?? 0);
-        $pw_check = $conn->prepare("SELECT password FROM users WHERE user_id = ? LIMIT 1");
-        $pw_check->bind_param("i", $user_id);
-        $pw_check->execute();
-        $pw_row = $pw_check->get_result()->fetch_assoc();
-        $pw_check->close();
-
-        $stored = $pw_row['password'] ?? '';
-        $valid  = false;
-
-        // Support both hashed and plaintext
-        if (strpos($stored, '$2y$') === 0) {
-            $valid = password_verify($current, $stored);
+        $new_hash = password_hash($new_pw, PASSWORD_DEFAULT);
+        
+        $upd_pw = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
+        $upd_pw->bind_param("si", $new_hash, $user_id);
+        if ($upd_pw->execute()) {
+            $success_msg = 'Password changed successfully.';
         } else {
-            $valid = ($current === $stored);
+            $error_msg = 'Failed to change password.';
         }
-
-        if (!$valid) {
-            $error_msg = 'Current password is incorrect.';
-        } else {
-            $new_hash = password_hash($new_pw, PASSWORD_DEFAULT);
-            $upd_pw = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
-            $upd_pw->bind_param("si", $new_hash, $user_id);
-            if ($upd_pw->execute()) {
-                $success_msg = 'Password changed successfully.';
-            } else {
-                $error_msg = 'Failed to change password.';
-            }
-            $upd_pw->close();
-        }
+        $upd_pw->close();
     }
 }
 
@@ -148,14 +114,20 @@ $extra_label = 'Settings';
         .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
         .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
 
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
+        /* Card Styles */
         .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .section-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; }
-        .form-label { font-size: 0.85rem; font-weight: 600; color: #334155; }
-        .form-control { border-radius: 10px; padding: 10px 14px; border: 1px solid #e2e8f0; font-size: 0.9rem; }
-        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(26,48,102,0.1); }
+        .form-label { font-size: 0.85rem; font-weight: 700; color: #334155; }
+        .form-control { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
+        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
+        .form-control[readonly] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
+
+        .btn-primary { background: var(--primary-blue); border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
+        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
+        .btn-dark { border-radius: 12px; padding: 12px 24px; font-weight: 700; transition: 0.3s; }
+        .btn-dark:hover { transform: translateY(-2px); }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -164,6 +136,7 @@ $extra_label = 'Settings';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
     </style>
 </head>
@@ -175,51 +148,54 @@ $extra_label = 'Settings';
 <main class="main-content">
 
     <div class="mb-4">
-        <h3 class="fw-bold mb-1">Settings</h3>
-        <p class="text-muted small mb-0">Manage your profile and account security</p>
+        <h3 class="fw-bold mb-1">Account Settings</h3>
+        <p class="text-muted small mb-0">Manage your contact details and account security</p>
     </div>
 
     <?php if ($success_msg): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center">
-            <i class="bi bi-check-circle-fill me-2"></i> <?php echo htmlspecialchars($success_msg); ?>
+        <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <span class="fw-medium"><?php echo htmlspecialchars($success_msg); ?></span>
         </div>
     <?php endif; ?>
     <?php if ($error_msg): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center">
-            <i class="bi bi-exclamation-circle-fill me-2"></i> <?php echo htmlspecialchars($error_msg); ?>
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
+            <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+            <span class="fw-medium"><?php echo htmlspecialchars($error_msg); ?></span>
         </div>
     <?php endif; ?>
 
     <div class="row g-4">
         <!-- Profile card -->
         <div class="col-lg-7">
-            <div class="card p-4">
+            <div class="card p-4 p-md-5 h-100">
                 <p class="section-title"><i class="bi bi-person-fill me-1"></i> Profile Information</p>
 
                 <form method="POST">
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control bg-light" value="<?php echo htmlspecialchars($staff_display_name); ?>" readonly>
-                        <small class="text-muted">Contact admin to change your name.</small>
+                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($staff_display_name); ?>" readonly>
+                        <small class="text-muted mt-1 d-block">Contact admin to change your legal name.</small>
                     </div>
 
-                    <div class="row g-3">
+                    <div class="row g-4">
                         <div class="col-md-6">
                             <label class="form-label">Email Address</label>
-                            <input type="email" name="email" class="form-control"
-                                   value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>"
-                                   placeholder="you@school.com">
+                            <!-- Email is now Read-Only -->
+                            <input type="email" class="form-control" 
+                                   value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>" readonly>
+                            <small class="text-muted mt-1 d-block">Email is managed by the school administration.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Phone Number</label>
                             <input type="text" name="phone" class="form-control"
                                    value="<?php echo htmlspecialchars($user_data['phone'] ?? ''); ?>"
-                                   placeholder="07...">
+                                   placeholder="07..." required>
                         </div>
                     </div>
 
-                    <div class="mt-4 text-end">
-                        <button type="submit" name="update_profile" class="btn btn-primary px-4 fw-bold rounded-3">
+                    <div class="mt-5 text-end">
+                        <button type="submit" name="update_profile" class="btn btn-primary shadow-sm">
                             <i class="bi bi-save me-2"></i>Save Changes
                         </button>
                     </div>
@@ -229,27 +205,25 @@ $extra_label = 'Settings';
 
         <!-- Password card -->
         <div class="col-lg-5">
-            <div class="card p-4">
-                <p class="section-title"><i class="bi bi-shield-lock-fill me-1"></i> Change Password</p>
+            <div class="card p-4 p-md-5 h-100">
+                <p class="section-title"><i class="bi bi-shield-lock-fill me-1"></i> Security</p>
 
                 <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Current Password</label>
-                        <input type="password" name="current_password" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
+                    <!-- Current Password Field Removed -->
+                    
+                    <div class="mb-4">
                         <label class="form-label">New Password</label>
-                        <input type="password" name="new_password" class="form-control" required minlength="6">
-                        <small class="text-muted">At least 6 characters.</small>
+                        <input type="password" name="new_password" class="form-control" required minlength="6" placeholder="Enter new password">
+                        <small class="text-muted mt-1 d-block">At least 6 characters.</small>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Confirm New Password</label>
-                        <input type="password" name="confirm_password" class="form-control" required minlength="6">
+                        <input type="password" name="confirm_password" class="form-control" required minlength="6" placeholder="Repeat new password">
                     </div>
 
-                    <div class="mt-4 text-end">
-                        <button type="submit" name="change_password" class="btn btn-dark px-4 fw-bold rounded-3">
-                            <i class="bi bi-key me-2"></i>Update Password
+                    <div class="mt-5 text-end">
+                        <button type="submit" name="change_password" class="btn btn-dark shadow-sm">
+                            <i class="bi bi-key-fill me-2"></i>Update Password
                         </button>
                     </div>
                 </form>

@@ -27,11 +27,10 @@ $student_id = (int) $student['student_id'];
 
 // Handle password change
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
-    $current = $_POST['current_password'] ?? '';
     $new     = $_POST['new_password']     ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
 
-    if ($current === '' || $new === '' || $confirm === '') {
+    if ($new === '' || $confirm === '') {
         $message = 'All fields are required.';
         $message_type = 'warning';
     } elseif ($new !== $confirm) {
@@ -41,38 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
         $message = 'New password must be at least 6 characters.';
         $message_type = 'danger';
     } else {
-        // Fetch current password
-        $p_stmt = $conn->prepare("SELECT password FROM students WHERE student_id = ? LIMIT 1");
-        $p_stmt->bind_param("i", $student_id);
-        $p_stmt->execute();
-        $p_row = $p_stmt->get_result()->fetch_assoc();
-        $p_stmt->close();
-
-        $stored = $p_row['password'] ?? '';
-        $valid = false;
-
-        if (strpos($stored, '$2y$') === 0) {
-            $valid = password_verify($current, $stored);
+        // Hash the new password directly
+        $hash = password_hash($new, PASSWORD_DEFAULT);
+        
+        $upd = $conn->prepare("UPDATE students SET password = ? WHERE student_id = ?");
+        $upd->bind_param("si", $hash, $student_id);
+        
+        if ($upd->execute()) {
+            $message = 'Password updated successfully. You can now use your new password.';
+            $message_type = 'success';
         } else {
-            $valid = ($current === $stored);
-        }
-
-        if (!$valid) {
-            $message = 'Current password is incorrect.';
+            $message = 'Failed to update password. Please try again.';
             $message_type = 'danger';
-        } else {
-            $hash = password_hash($new, PASSWORD_DEFAULT);
-            $upd = $conn->prepare("UPDATE students SET password = ? WHERE student_id = ?");
-            $upd->bind_param("si", $hash, $student_id);
-            if ($upd->execute()) {
-                $message = 'Password updated successfully.';
-                $message_type = 'success';
-            } else {
-                $message = 'Failed to update password.';
-                $message_type = 'danger';
-            }
-            $upd->close();
         }
+        $upd->close();
     }
 }
 
@@ -90,9 +71,15 @@ $extra_label = 'Change Password';
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
+        :root { 
+            --sidebar-bg: #34445c; 
+            --submenu-bg: #2c3a4d; 
+            --primary-blue: #1a3066; 
+            --sidebar-width: 240px; 
+        }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
+        /* Sidebar */
         .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
         body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
         body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
@@ -110,12 +97,18 @@ $extra_label = 'Change Password';
         .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        /* Modern Security Card */
         .security-card { max-width: 560px; margin: 0 auto; }
-        .form-label { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-        .form-control { border-radius: 10px; padding: 12px 16px; border: 1px solid #e2e8f0; font-size: 0.9rem; background: #f8fafc; }
-        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(26,48,102,0.1); background: #fff; }
-        .icon-badge { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #dbeafe, #e0e7ff); color: #4f46e5; display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+        .card { border: none; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background: white; }
+        
+        .icon-badge { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #2563eb; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15); }
+        
+        .form-label { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+        .form-control { border-radius: 12px; padding: 14px 16px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
+        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
+        
+        .btn-primary { background: var(--primary-blue); border: none; padding: 14px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
+        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(26,48,102,0.3); }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
         .sidebar-overlay.active { display: block; }
@@ -124,6 +117,7 @@ $extra_label = 'Change Password';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
     </style>
 </head>
@@ -135,32 +129,24 @@ $extra_label = 'Change Password';
 <main class="main-content">
 
     <div class="security-card">
-        <div class="text-center mb-4">
-            <div class="icon-badge mb-3">
+        <div class="text-center mb-5">
+            <div class="icon-badge">
                 <i class="bi bi-shield-lock-fill"></i>
             </div>
-            <h2 class="fw-bold mb-1">Security Settings</h2>
+            <h2 class="fw-bold mb-1 text-dark">Security Settings</h2>
             <p class="text-muted small mb-0">Update your password to keep your account secure</p>
         </div>
 
         <?php if ($message): ?>
-            <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center">
-                <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'exclamation-circle-fill'; ?> me-2"></i>
-                <?php echo htmlspecialchars($message); ?>
+            <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
+                <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'exclamation-circle-fill'; ?> me-2 fs-5"></i>
+                <span class="fw-medium"><?php echo htmlspecialchars($message); ?></span>
             </div>
         <?php endif; ?>
 
         <div class="card p-4 p-md-5">
             <form method="POST">
-                <div class="mb-3">
-                    <label class="form-label">Current Password</label>
-                    <input type="password" name="current_password" class="form-control"
-                           placeholder="Enter current password" required>
-                </div>
-
-                <hr class="my-4 opacity-25">
-
-                <div class="mb-3">
+                <div class="mb-4">
                     <label class="form-label">New Password</label>
                     <input type="password" name="new_password" class="form-control"
                            placeholder="Minimum 6 characters" required minlength="6">
@@ -172,18 +158,19 @@ $extra_label = 'Change Password';
                            placeholder="Repeat new password" required minlength="6">
                 </div>
 
-                <button type="submit" name="update_password"
-                        class="btn btn-primary w-100 py-3 fw-bold rounded-3">
-                    <i class="bi bi-key me-2"></i>Update Password
+                <button type="submit" name="update_password" class="btn btn-primary w-100 shadow-sm">
+                    <i class="bi bi-key-fill me-2"></i>Update Password
                 </button>
             </form>
         </div>
 
-        <div class="card p-3 mt-4 border-start border-4 border-info">
-            <p class="mb-0 small text-muted">
-                <i class="bi bi-lightbulb-fill me-2 text-info"></i>
-                <strong>Tip:</strong> Use a combination of letters, numbers, and symbols for a strong password.
-            </p>
+        <div class="card p-4 mt-4 border-start border-4 border-info bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-lightbulb-fill fs-3 text-info"></i>
+                <p class="mb-0 small text-muted fw-medium">
+                    <strong>Security Tip:</strong> Use a strong combination of letters, numbers, and symbols to protect your account.
+                </p>
+            </div>
         </div>
     </div>
 

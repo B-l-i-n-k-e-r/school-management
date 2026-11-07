@@ -1,12 +1,6 @@
 <?php
 /**
  * Shared Lecturer Sidebar
- * Expected (optional) variables before include:
- *   $active_page — string, used to highlight current menu item
- *                  values: 'dashboard', 'attendance', 'attendance_history',
- *                          'results', 'grade_sheets', 'timetable',
- *                          'my_classes', 'assignments', 'discipline',
- *                          'messaging', 'profile', 'settings'
  */
 $active_page = $active_page ?? '';
 ?>
@@ -67,6 +61,13 @@ $active_page = $active_page ?? '';
     <div class="nav-item-container">
         <a href="messaging.php" class="nav-link-custom <?php echo $active_page === 'messaging' ? 'active' : ''; ?>">
             <span><i class="bi bi-chat-dots-fill me-2"></i> Messaging</span>
+        </a>
+    </div>
+
+    <!-- NEW DOWNLOADS TAB ADDED HERE -->
+    <div class="nav-item-container">
+        <a href="downloads.php" class="nav-link-custom <?php echo $active_page === 'downloads' ? 'active' : ''; ?>">
+            <span><i class="bi bi-cloud-arrow-down-fill me-2"></i> Downloads</span>
         </a>
     </div>
 </div>

@@ -5,12 +5,12 @@
  *   $active_page — string, highlights the current menu item
  *                  values: 'dashboard', 'registration', 'course_work', 'exam_card',
  *                          'results', 'academic_leave', 'clearance', 'fees',
- *                          'receipts', 'downloads', 'reset_password', 'profile'
+ *                          'receipts', 'downloads', 'reset_password', 'profile', 'messages'
  */
 $active_page = $active_page ?? '';
 $acad_active = in_array($active_page, ['registration','course_work','exam_card','results','academic_leave','clearance']);
 $fin_active  = in_array($active_page, ['fees','receipts']);
-$self_active = in_array($active_page, ['downloads','reset_password','profile']);
+$self_active = in_array($active_page, ['downloads','reset_password','profile','messages']);
 ?>
 <div class="overlay" id="sidebarOverlay"></div>
 
@@ -50,6 +50,14 @@ $self_active = in_array($active_page, ['downloads','reset_password','profile']);
             <li><a href="fees.php"     <?php echo $active_page === 'fees'     ? 'style="color:#f6e05e;"' : ''; ?>>Fee Balance</a></li>
             <li><a href="receipts.php" <?php echo $active_page === 'receipts' ? 'style="color:#f6e05e;"' : ''; ?>>Receipts</a></li>
         </ul>
+    </div>
+
+    <!-- NEW MESSAGES TAB ADDED HERE -->
+    <div class="nav-item">
+        <a href="messages.php" class="nav-link <?php echo $active_page === 'messages' ? 'active' : ''; ?>">
+            <span><i class="bi bi-chat-dots-fill me-2"></i> Messages</span>
+            <!-- Optional: Add a red badge for unread messages here later -->
+        </a>
     </div>
 
     <div class="nav-item">

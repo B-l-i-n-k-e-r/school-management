@@ -1,12 +1,6 @@
 <?php
 /**
  * Shared Admin Sidebar
- * Expected (optional) variable before include:
- *   $active_page — string, highlights the current menu item
- *                  values: 'dashboard', 'admission', 'student_list',
- *                          'forms', 'subjects', 'exams', 'manage_timetable',
- *                          'fee_structure', 'collections', 'reports',
- *                          'staff', 'notices', 'settings'
  */
 $active_page = $active_page ?? '';
 
@@ -66,6 +60,13 @@ $finance_active   = in_array($active_page, ['fee_structure', 'collections', 'rep
     <div class="nav-item">
         <a href="notices.php" class="nav-link <?php echo $active_page === 'notices' ? 'active' : ''; ?>">
             <span><i class="bi bi-megaphone-fill me-2"></i> Notices</span>
+        </a>
+    </div>
+
+    <!-- NEW DOWNLOADS TAB -->
+    <div class="nav-item">
+        <a href="downloads.php" class="nav-link <?php echo $active_page === 'downloads' ? 'active' : ''; ?>">
+            <span><i class="bi bi-cloud-arrow-down-fill me-2"></i> Downloads</span>
         </a>
     </div>
 

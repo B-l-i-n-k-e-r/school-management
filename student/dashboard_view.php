@@ -29,7 +29,7 @@ if (!$student) {
 $student_id = (int) $student['student_id'];
 $student_form = $student['form'] ?? ''; 
 
-// FIXED: Fetch the Fee Structure total for this student's class
+// Fetch the Fee Structure total for this student's class
 $total_fees = 0;
 $structure_stmt = $conn->prepare("SELECT total_amount FROM fee_structure WHERE form = ? LIMIT 1");
 if ($structure_stmt) {
@@ -57,6 +57,10 @@ if ($fee_stmt) {
 
 // Compute balance
 $balance = $total_fees - $amount_paid;
+
+// Check for profile photo
+$avatar_path = "../images/avatars/" . ($student['avatar'] ?? '');
+$has_avatar = !empty($student['avatar']) && file_exists($avatar_path);
 
 $student_display_name = $student['full_name'] ?? 'Student';
 $active_page = 'dashboard';
@@ -103,15 +107,24 @@ $extra_label = 'Student Profile';
 
         .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
 
-        .profile-container { background: white; border-radius: 16px; display: flex; flex-wrap: wrap; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); gap: 40px; }
+        .profile-container { background: white; border-radius: 20px; display: flex; flex-wrap: wrap; padding: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); gap: 40px; }
+        
         .avatar-section { flex: 0 0 200px; text-align: center; }
-        .avatar-circle { width: 150px; height: 150px; background: #e2e8f0; border-radius: 50%; margin: 0 auto; overflow: hidden; border: 5px solid #f6e05e; display: flex; align-items: center; justify-content: center; }
+        
+        /* Modern Avatar Image */
+        .avatar-circle { 
+            width: 150px; height: 150px; background: #e2e8f0; border-radius: 50%; 
+            margin: 0 auto; overflow: hidden; border: 5px solid #fff; 
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
         .avatar-circle i { font-size: 5rem; color: #94a3b8; }
 
         .info-section { flex: 1; min-width: 300px; }
-        .info-row { display: flex; flex-wrap: wrap; border-bottom: 1px solid #edf2f7; padding: 12px 0; font-size: 0.9rem; }
+        .info-row { display: flex; flex-wrap: wrap; border-bottom: 1px solid #edf2f7; padding: 14px 0; font-size: 0.95rem; }
         .info-label { flex: 0 0 200px; color: #718096; font-weight: 500; }
-        .info-value { flex: 1; color: #0f172a; font-weight: 600; }
+        .info-value { flex: 1; color: #0f172a; font-weight: 700; }
         .info-value.accent { color: #0d7d8c; }
 
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
@@ -121,6 +134,7 @@ $extra_label = 'Student Profile';
             .sidebar { left: calc(-1 * var(--sidebar-width)); }
             .sidebar.active { left: 0 !important; }
             .topbar, .main-content { margin-left: 0 !important; }
+            .main-content { padding: 20px; }
         }
     </style>
 </head>
@@ -131,17 +145,21 @@ $extra_label = 'Student Profile';
 
 <main class="main-content">
     <div class="mb-4">
-        <h2 class="fw-bold mb-1">My Profile</h2>
+        <h2 class="fw-bold mb-1 text-dark">My Profile</h2>
         <p class="text-muted small mb-0">Your official student record</p>
     </div>
 
     <div class="profile-container">
         <div class="avatar-section">
             <div class="avatar-circle">
-                <i class="bi bi-person-fill"></i>
+                <?php if ($has_avatar): ?>
+                    <img src="<?php echo $avatar_path; ?>" alt="Profile Photo">
+                <?php else: ?>
+                    <i class="bi bi-person-fill"></i>
+                <?php endif; ?>
             </div>
-            <p class="mt-3 fw-bold text-uppercase mb-0"><?php echo htmlspecialchars($student['full_name'] ?? ''); ?></p>
-            <p class="text-muted small"><?php echo htmlspecialchars($student['adm_no'] ?? ''); ?></p>
+            <p class="mt-4 fw-bold text-uppercase mb-1 fs-5 text-dark"><?php echo htmlspecialchars($student['full_name'] ?? ''); ?></p>
+            <span class="badge bg-secondary-subtle text-secondary border px-3 py-2"><?php echo htmlspecialchars($student['adm_no'] ?? ''); ?></span>
         </div>
 
         <div class="info-section">
@@ -187,7 +205,7 @@ $extra_label = 'Student Profile';
                 </div>
                 <div class="info-row" style="border-bottom: none;">
                     <div class="info-label fw-bold">Balance</div>
-                    <div class="info-value fw-bold <?php echo $balance > 0 ? 'text-danger' : 'text-success'; ?>">
+                    <div class="info-value fw-bold fs-5 <?php echo $balance > 0 ? 'text-danger' : 'text-success'; ?>">
                         KES <?php echo number_format($balance, 2); ?>
                     </div>
                 </div>
