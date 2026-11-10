@@ -1,9 +1,7 @@
 <?php
 // 1. Database Connection
-include("../includes/header.php");
-
 $host = 'localhost';
-$db   = 'school_admin_db'; 
+$db   = 'school_admin_db';
 $user = 'root';
 $pass = '';
 $charset = 'utf8mb4';
@@ -16,256 +14,308 @@ $options = [
 ];
 
 try {
-     $pdo = new PDO($dsn, $user, $pass, $options);
+    $pdo = new PDO($dsn, $user, $pass, $options);
 } catch (\PDOException $e) {
-     die("Database connection failed: " . $e->getMessage());
+    die("Database connection failed: " . $e->getMessage());
 }
 
 // 2. Fetch Data
 $stmt = $pdo->query("SELECT * FROM standard ORDER BY sort_order ASC");
 $standards = $stmt->fetchAll();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Academic Structure | The Michaelson School</title>
-    
-    <!-- Fonts & Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
     <style>
         :root {
-            --primary: #0f172a;
-            --primary-light: #1e293b;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --bg: #f8fafc;
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
             --white: #ffffff;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 28px;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
-            color: var(--text-main);
-            line-height: 1.6;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            color: var(--ink);
+            background-color: var(--bg-light);
             -webkit-font-smoothing: antialiased;
         }
 
-        h1, h2, h3 {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-
-        /* --- Modern Hero Section --- */
-        .hero {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-            color: white;
-            padding: 100px 20px;
-            text-align: center;
+        /* ---------- Hero ---------- */
+        .cl-hero {
             position: relative;
+            background:
+                linear-gradient(100deg, rgba(0, 10, 102, 0.94) 0%, rgba(0, 10, 102, 0.78) 55%, rgba(0, 10, 102, 0.45) 100%),
+                url('../images/school_bg.jpg') center / cover no-repeat;
+            color: var(--white);
+            padding: 110px 24px 170px;
             overflow: hidden;
         }
-
-        /* Decorative background circles */
-        .hero::before, .hero::after {
-            content: '';
+        .cl-hero::after {
+            content: "";
             position: absolute;
+            right: -120px;
+            bottom: -160px;
+            width: 420px;
+            height: 420px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.03);
+            background: radial-gradient(circle, rgba(250, 204, 21, 0.28), transparent 70%);
+            pointer-events: none;
         }
-        .hero::before {
-            width: 400px; height: 400px;
-            top: -100px; left: -100px;
-        }
-        .hero::after {
-            width: 300px; height: 300px;
-            bottom: -50px; right: -50px;
-        }
-
-        .hero-content {
+        .cl-hero-inner {
             position: relative;
             z-index: 1;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .hero h1 {
-            font-size: clamp(2.5rem, 5vw, 4rem);
-            font-weight: 800;
-            letter-spacing: -1.5px;
-            margin-bottom: 15px;
-        }
-
-        .hero p {
-            font-size: 1.2rem;
-            color: #94a3b8;
-            font-weight: 400;
-        }
-
-        /* --- Container & Table --- */
-        .container {
             max-width: 1100px;
-            margin: -50px auto 80px;
-            padding: 0 20px;
-            position: relative;
-            z-index: 10;
+            margin: 0 auto;
+            animation: cl-rise 0.8s ease both;
+        }
+        .cl-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            backdrop-filter: blur(6px);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 26px;
+        }
+        .cl-tag i { color: var(--accent); }
+        .cl-hero h1 {
+            font-size: clamp(2.2rem, 5.2vw, 3.9rem);
+            line-height: 1.08;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0 0 22px;
+            max-width: 14ch;
+        }
+        .cl-hero p {
+            max-width: 540px;
+            margin: 0;
+            font-size: 1.1rem;
+            line-height: 1.75;
+            color: rgba(255, 255, 255, 0.88);
+        }
+        .cl-rule {
+            width: 72px;
+            height: 5px;
+            border-radius: 99px;
+            background: var(--accent);
+            margin-top: 34px;
         }
 
-        .table-card {
+        /* ---------- Table card ---------- */
+        .cl-wrap {
+            max-width: 1100px;
+            margin: -100px auto 0;
+            padding: 0 24px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 2;
+        }
+        .cl-card {
             background: var(--white);
-            border-radius: 24px;
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
-            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 30px 60px -20px rgba(0, 10, 102, 0.22);
             overflow: hidden;
         }
-
-        .table-header {
-            padding: 24px 30px;
-            border-bottom: 1px solid var(--border);
+        .cl-card-head {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 28px 36px;
+            border-bottom: 1px solid var(--line);
         }
-
-        .table-header h3 {
-            font-size: 1.25rem;
+        .cl-card-head h2 {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
             color: var(--primary);
         }
+        .cl-card-head h2 i {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            background: var(--primary-tint);
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+        .cl-count {
+            padding: 8px 16px;
+            border-radius: 99px;
+            background: var(--accent);
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
 
-        table {
+        .cl-table {
             width: 100%;
             border-collapse: collapse;
         }
-
-        thead {
-            background-color: #f8fafc;
-        }
-
-        th {
-            padding: 16px 30px;
+        .cl-table th {
+            padding: 16px 36px;
             text-align: left;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
+            font-size: 0.82rem;
             font-weight: 700;
-            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--line);
+        }
+        .cl-table td {
+            padding: 20px 36px;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.97rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .cl-table tbody tr:last-child td { border-bottom: none; }
+        .cl-table tbody tr { transition: background-color 0.2s; }
+        .cl-table tbody tr:hover { background: var(--primary-tint); }
+
+        .cl-form {
+            color: var(--primary);
+            font-size: 1.05rem;
+            font-weight: 800;
         }
 
-        td {
-            padding: 20px 30px;
-            border-bottom: 1px solid var(--border);
-            font-weight: 500;
-            color: var(--text-main);
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        tr {
-            transition: background-color 0.2s ease;
-        }
-
-        tr:hover {
-            background-color: #f1f5f9;
-        }
-
-        /* --- Badges --- */
-        .badge {
+        /* ---------- Level badges ---------- */
+        .cl-badge {
             display: inline-flex;
             align-items: center;
-            padding: 6px 12px;
-            border-radius: 50px;
+            padding: 6px 14px;
+            border-radius: 99px;
             font-size: 0.85rem;
-            font-weight: 600;
-            letter-spacing: 0.3px;
+            font-weight: 700;
+        }
+        .cl-badge.is-primary {
+            background: var(--primary-tint);
+            color: var(--primary);
+        }
+        .cl-badge.is-secondary {
+            background: var(--accent-tint);
+            color: var(--accent-deep);
         }
 
-        .badge-primary {
-            background-color: #eff6ff;
-            color: var(--accent);
-        }
-
-        .badge-secondary {
-            background-color: #f1f5f9;
+        /* ---------- Empty state ---------- */
+        .cl-empty {
+            text-align: center;
+            padding: 60px 20px !important;
             color: var(--text-muted);
         }
-
-        /* --- Footer --- */
-        footer {
-            background: var(--primary);
-            color: #94a3b8;
-            text-align: center;
-            padding: 40px 20px;
-            font-size: 0.9rem;
+        .cl-empty i {
+            display: block;
+            font-size: 2.4rem;
+            margin-bottom: 12px;
+            color: var(--primary);
+            opacity: 0.4;
         }
 
-        /* --- Mobile Responsiveness --- */
+        /* ---------- Footer ---------- */
+        .cl-footer {
+            background: var(--primary);
+            color: rgba(255, 255, 255, 0.85);
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 90px;
+            font-size: 0.92rem;
+            border-top: 4px solid var(--accent);
+        }
+
+        @keyframes cl-rise {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cl-hero-inner { animation: none; }
+        }
+
+        /* ---------- Mobile: each row becomes a small card ---------- */
         @media (max-width: 768px) {
-            thead { display: none; }
-            table, tbody, tr, td { display: block; width: 100%; }
-            tr { 
-                margin-bottom: 15px; 
-                border: 1px solid var(--border); 
-                border-radius: 12px;
-                padding: 10px;
+            .cl-hero { padding: 80px 20px 150px; }
+            .cl-card-head { padding: 22px 20px; }
+            .cl-card-head h2 { font-size: 1.1rem; }
+
+            .cl-card { background: transparent; box-shadow: none; }
+            .cl-card-head {
+                background: var(--white);
+                border-radius: var(--radius-lg);
+                border-bottom: none;
+                margin-bottom: 14px;
+                box-shadow: 0 20px 40px -20px rgba(0, 10, 102, 0.22);
             }
-            td { 
-                border-bottom: none; 
-                padding: 12px 20px; 
-                display: flex; 
-                justify-content: space-between; 
+
+            .cl-table thead { display: none; }
+            .cl-table, .cl-table tbody, .cl-table tr, .cl-table td { display: block; width: 100%; box-sizing: border-box; }
+            .cl-table tr {
+                margin-bottom: 12px;
+                padding: 8px 6px;
+                background: var(--white);
+                border: 1px solid var(--line);
+                border-radius: 18px;
+            }
+            .cl-table td {
+                display: flex;
+                justify-content: space-between;
                 align-items: center;
+                gap: 12px;
+                padding: 10px 16px;
+                border-bottom: none;
             }
-            td::before { 
-                content: attr(data-label); 
-                font-weight: 700; 
-                color: var(--text-muted);
+            .cl-table td::before {
+                content: attr(data-label);
                 font-size: 0.8rem;
-                text-transform: uppercase;
+                font-weight: 700;
+                color: var(--text-muted);
             }
-            .table-card {
-                background: transparent;
-                box-shadow: none;
-                border: none;
-            }
-            .table-header { display: none; }
         }
     </style>
 </head>
 <body>
- 
-<!-- Hero Section -->
-<section class="hero">
-    <div class="hero-content">
+
+<?php include("../includes/header.php"); ?>
+
+<section class="cl-hero">
+    <div class="cl-hero-inner">
+        <div class="cl-tag"><i class="bi bi-journal-bookmark-fill"></i> Classes</div>
         <h1>Academic Structure</h1>
         <p>Explore our comprehensive curriculum from Primary to Secondary levels.</p>
+        <div class="cl-rule"></div>
     </div>
 </section>
 
-<!-- Main Content -->
-<div class="container">
-    <div class="table-card">
-        <div class="table-header">
-            <h3><i class="bi bi-journal-bookmark-fill me-2" style="color: var(--accent);"></i> Available Classes</h3>
+<main class="cl-wrap">
+    <div class="cl-card">
+        <div class="cl-card-head">
+            <h2><i class="bi bi-mortarboard-fill"></i> Available Classes</h2>
+            <?php if (!empty($standards)): ?>
+                <span class="cl-count"><?php echo count($standards); ?> classes</span>
+            <?php endif; ?>
         </div>
-        
-        <table>
+
+        <table class="cl-table">
             <thead>
                 <tr>
                     <th>Form / Grade</th>
@@ -277,67 +327,34 @@ $standards = $stmt->fetchAll();
                 <?php if (!empty($standards)): ?>
                     <?php foreach ($standards as $row): ?>
                     <tr>
-                        <!-- Using data-label for mobile responsive view -->
-                        <td data-label="Form/Grade">
-                            <strong style="color: var(--primary); font-size: 1.05rem;">
-                                <?php echo htmlspecialchars($row['form'] ?? 'N/A'); ?>
-                            </strong>
+                        <td data-label="Form / Grade">
+                            <span class="cl-form"><?php echo htmlspecialchars($row['form'] ?? 'N/A'); ?></span>
                         </td>
                         <td data-label="Level">
-                            <span class="badge <?php echo ($row['level'] == 'Primary') ? 'badge-primary' : 'badge-secondary'; ?>">
+                            <span class="cl-badge <?php echo (($row['level'] ?? '') === 'Primary') ? 'is-primary' : 'is-secondary'; ?>">
                                 <?php echo htmlspecialchars($row['level'] ?? 'N/A'); ?>
                             </span>
                         </td>
                         <td data-label="Curriculum">
-                            <span style="color: var(--text-muted); font-weight: 600;">
-                                <?php echo htmlspecialchars($row['curriculum'] ?? 'N/A'); ?>
-                            </span>
+                            <?php echo htmlspecialchars($row['curriculum'] ?? 'N/A'); ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="3" style="text-align:center; padding: 50px; color: var(--text-muted);">
-                            <i class="bi bi-inbox fs-1 d-block mb-3"></i>
-                            No records found in the database.
+                        <td colspan="3" class="cl-empty">
+                            <i class="bi bi-inbox"></i>
+                            No classes have been added yet.
                         </td>
                     </tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
-</div>
+</main>
 
-<script>
-// Existing dropdown script from your code
-function toggleDropdown() {
-    const dropdown = document.getElementById("loginDropdown");
-    const btn = document.getElementById("loginBtn");
-    if (dropdown && btn) {
-        dropdown.classList.toggle("show");
-        btn.classList.toggle("active");
-    }
-}
-
-window.onclick = function(event) {
-    if (!event.target.closest('.dropdown')) {
-        const dropdowns = document.getElementsByClassName("dropdown-content");
-        const buttons = document.getElementsByClassName("dropbtn");
-        
-        for (let i = 0; i < dropdowns.length; i++) {
-            if (dropdowns[i].classList.contains('show')) {
-                dropdowns[i].classList.remove('show');
-            }
-        }
-        for (let j = 0; j < buttons.length; j++) {
-            buttons[j].classList.remove('active');
-        }
-    }
-}
-</script>
-
-<footer>
-    <p>&copy; <?php echo date('Y'); ?> The Michaelson School, Kenya. All Rights Reserved.</p>
+<footer class="cl-footer">
+    &copy; <?php echo date('Y'); ?> The Michaelson School, Kenya. All Rights Reserved.
 </footer>
 
 </body>

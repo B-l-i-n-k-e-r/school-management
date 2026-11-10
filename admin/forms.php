@@ -29,7 +29,8 @@ if (isset($_POST['add_form'])) {
         $stmt = $conn->prepare("INSERT INTO classes (name, level, curriculum, sort_order) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("sssi", $form_name, $level, $curr, $order);
         if ($stmt->execute()) {
-            $message = "New academic level <strong>" . htmlspecialchars($form_name) . "</strong> added successfully!";
+            $message = "New academic level <strong>" . htmlspecialchars($form_name) . "</strong> added successfully! "
+                     . "Next, add its subjects, then build its timetable.";
             $message_type = 'success';
         } else {
             $message = "Error: " . htmlspecialchars($stmt->error);
@@ -56,11 +57,12 @@ if (isset($_GET['deleted'])) {
     $message_type = 'info';
 }
 
-// ---- Fetch all classes + student counts ----
+// ---- Fetch all classes + student and subject counts ----
 $classes = [];
 $query = "
     SELECT c.*,
-        (SELECT COUNT(*) FROM students s WHERE TRIM(s.form) = TRIM(c.name)) AS student_count
+        (SELECT COUNT(*) FROM students s WHERE TRIM(s.form) = TRIM(c.name)) AS student_count,
+        (SELECT COUNT(*) FROM subjects sb WHERE TRIM(sb.form) = TRIM(c.name)) AS subject_count
     FROM classes c
     ORDER BY c.sort_order ASC, c.name ASC
 ";
@@ -68,6 +70,33 @@ $result = mysqli_query($conn, $query);
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) $classes[] = $row;
 }
+
+// ---- Group the levels: Primary grades, then Secondary forms ----
+$groups = [
+    'Primary'   => ['title' => 'Primary',   'sub' => 'Grades (CBC)',  'icon' => 'bi-backpack2-fill', 'items' => []],
+    'Secondary' => ['title' => 'Secondary', 'sub' => 'Forms (8-4-4)', 'icon' => 'bi-mortarboard-fill', 'items' => []],
+];
+foreach ($classes as $c) {
+    $lvl = $c['level'] ?? '';
+    if (!isset($groups[$lvl])) {
+        $groups[$lvl] = ['title' => ($lvl ?: 'Other'), 'sub' => '', 'icon' => 'bi-journal-fill', 'items' => []];
+    }
+    $groups[$lvl]['items'][] = $c;
+}
+
+// Names that already exist, so the quick-add chips can grey them out
+$existing = array_map(fn($c) => strtolower(trim($c['name'])), $classes);
+$suggested = [
+    'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9',
+    'Form 1', 'Form 2', 'Form 3', 'Form 4',
+];
+
+$message_icons = [
+    'success' => 'bi-check-circle-fill',
+    'danger'  => 'bi-x-circle-fill',
+    'warning' => 'bi-exclamation-triangle-fill',
+    'info'    => 'bi-info-circle-fill',
+];
 
 $active_page = 'forms';
 $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
@@ -84,120 +113,142 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --sidebar-bg: #34445c;
-            --sidebar-header: #dee2e6;
-            --primary-blue: #1a3066;
-            --sidebar-width: 260px;
+        /* ---------- Set-up steps ---------- */
+        .fx-steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .fx-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px 8px 8px;
+            border-radius: 99px;
+            background: var(--white);
+            box-shadow: 0 16px 32px -24px rgba(0, 10, 102, 0.3);
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .fx-step b {
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--primary);
+            color: var(--accent);
+            font-size: 0.8rem;
         }
 
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
-
-        /* Sidebar */
-        .sidebar {
-            width: var(--sidebar-width); height: 100vh;
-            background: var(--sidebar-bg); color: white;
-            position: fixed; left: 0; top: 0;
-            z-index: 1200; transition: all 0.3s ease;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
+        /* ---------- Level groups ---------- */
+        .fx-group { margin-bottom: 40px; }
+        .fx-group-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
         }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar,
-        body.sidebar-toggled .main-content { margin-left: 0; }
-
-        .sidebar-header {
-            background: var(--sidebar-header); padding: 12px 20px;
-            display: flex; align-items: center; gap: 12px; height: 70px;
+        .fx-group-icon {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            background: var(--primary);
+            color: var(--accent);
+            font-size: 1.2rem;
         }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; }
-
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link {
-            color: #d1d5db; padding: 15px 20px; font-size: 0.95rem;
-            display: flex; align-items: center; justify-content: space-between;
-            text-decoration: none; transition: 0.2s; cursor: pointer;
+        .fx-group-head h2 {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--primary);
         }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
+        .fx-group-head span.sub { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
 
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
-
-        /* Topbar */
-        .topbar {
-            margin-left: var(--sidebar-width); background: #fff;
-            height: 70px; display: flex; justify-content: space-between;
-            align-items: center; padding: 0 30px;
-            border-bottom: 1px solid #e2e8f0;
-            transition: all 0.3s ease;
+        .fx-levels {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+            gap: 20px;
         }
-        #hamburger { color: #34445c; cursor: pointer; font-size: 1.8rem; }
-
-        /* Main content */
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        /* Cards */
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .adm-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: 0.3s; }
-        .adm-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-
-        .icon-box {
-            width: 48px; height: 48px; background: #eef2ff; color: var(--primary-blue);
-            border-radius: 12px; display: flex; align-items: center; justify-content: center;
-            font-size: 1.25rem;
+        .fx-level {
+            display: flex;
+            flex-direction: column;
+            background: var(--white);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22);
         }
+        .fx-level-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .fx-level h3 {
+            margin: 0 0 6px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--ink);
+        }
+        .fx-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .fx-stat {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: var(--bg-light);
+        }
+        .fx-stat strong { display: block; font-size: 1.3rem; font-weight: 800; color: var(--primary); line-height: 1.1; }
+        .fx-stat span { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
 
-        .class-badge {
-            background: #eef2ff;
-            color: var(--primary-blue);
+        .fx-hint {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            margin: 0 0 14px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: var(--accent-tint);
+            color: var(--accent-deep);
+            font-size: 0.8rem;
             font-weight: 600;
+            line-height: 1.45;
         }
+        .fx-hint a { color: inherit; font-weight: 800; }
 
-        /* Modal */
-        .modal-content { border: none; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
-        .modal-header { border: 0; padding: 24px 24px 0; }
-        .modal-body { padding: 24px; }
-        .modal-footer { border: 0; padding: 0 24px 24px; }
+        .fx-level-actions { margin-top: auto; display: grid; gap: 8px; }
+        .fx-level-actions .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .fx-level-actions .ui-btn { width: 100%; }
+        a.ui-icon { text-decoration: none; }
 
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .form-control, .form-select {
-            border-radius: 12px; padding: 12px 15px;
-            border: 1px solid #e2e8f0; background-color: #f8fafc;
-            font-size: 0.9rem; transition: all 0.2s;
+        /* ---------- Quick-add chips ---------- */
+        .fx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .fx-chip {
+            padding: 7px 14px;
+            border: 1.5px solid var(--line);
+            border-radius: 99px;
+            background: var(--white);
+            color: var(--primary);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
         }
-        .form-control:focus, .form-select:focus {
-            box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12);
-            border-color: var(--primary-blue);
-            background: #fff;
-        }
-
-        .btn-primary {
-            background: var(--primary-blue); border: none;
-            padding: 14px; border-radius: 12px;
-            font-weight: 700; transition: 0.3s;
-        }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-
-        /* Mobile overlay */
-        .sidebar-overlay {
-            display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; background: rgba(0,0,0,0.4);
-            z-index: 1150;
-        }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        .fx-chip:hover { background: var(--primary-tint); border-color: var(--primary); }
+        .fx-chip:disabled { opacity: 0.45; cursor: not-allowed; background: var(--bg-light); border-style: dashed; }
+        .fx-chip-label { margin: 18px 0 0; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); }
+        .fx-note { margin: 14px 0 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -207,96 +258,149 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Academic Levels</h2>
-            <p class="text-muted small mb-0">Configure and manage your school's Form structures</p>
+            <h1>Forms &amp; grades</h1>
+            <p>Set up each level, then add its subjects and build its timetable</p>
         </div>
-        <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#addFormModal">
-            <i class="bi bi-plus-lg me-2"></i>Create New Level
-        </button>
+        <div class="ui-actions">
+            <button type="button" class="ui-btn is-primary" data-bs-toggle="modal" data-bs-target="#addFormModal">
+                <i class="bi bi-plus-lg"></i> Create level
+            </button>
+        </div>
+    </div>
+
+    <div class="fx-steps">
+        <span class="fx-step"><b>1</b> Create the level</span>
+        <span class="fx-step"><b>2</b> Add its subjects</span>
+        <span class="fx-step"><b>3</b> Build its timetable</span>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4">
-            <?php echo $message; ?>
+        <div class="ui-alert is-<?php echo htmlspecialchars($message_type); ?>" role="alert">
+            <i class="bi <?php echo $message_icons[$message_type] ?? 'bi-info-circle-fill'; ?>"></i>
+            <span><?php echo $message; ?></span>
         </div>
     <?php endif; ?>
 
-    <div class="row g-4">
-        <?php if (empty($classes)): ?>
-            <div class="col-12">
-                <div class="card p-5 text-center">
-                    <i class="bi bi-mortarboard fs-1 text-muted d-block mb-3"></i>
-                    <h5 class="fw-bold text-muted">No academic levels yet</h5>
-                    <p class="text-muted mb-3">Click <strong>Create New Level</strong> to add Form 1, Grade 1, etc.</p>
-                    <button class="btn btn-primary rounded-pill px-4 mx-auto" style="width: fit-content;"
-                            data-bs-toggle="modal" data-bs-target="#addFormModal">
-                        <i class="bi bi-plus-lg me-2"></i>Create New Level
-                    </button>
-                </div>
+    <?php if (empty($classes)): ?>
+        <section class="panel">
+            <div class="ui-empty">
+                <i class="bi bi-mortarboard"></i>
+                <p>No academic levels yet</p>
+                <small>Create your first level, such as Form 1 or Grade 7.</small>
+                <button type="button" class="ui-btn is-primary" style="margin-top:18px;"
+                        data-bs-toggle="modal" data-bs-target="#addFormModal">
+                    <i class="bi bi-plus-lg"></i> Create level
+                </button>
             </div>
-        <?php else: foreach ($classes as $row): ?>
-            <div class="col-md-4 col-lg-3">
-                <div class="card adm-card p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-4">
-                        <div class="icon-box"><i class="bi bi-mortarboard-fill"></i></div>
-                        <div class="dropdown">
-                            <i class="bi bi-three-dots-vertical" data-bs-toggle="dropdown" style="cursor:pointer"></i>
-                            <ul class="dropdown-menu dropdown-menu-end border-0 shadow text-nowrap">
-                                <li>
-                                    <a class="dropdown-item small" href="manage_timetable.php?form=<?php echo urlencode($row['name']); ?>">
-                                        <i class="bi bi-calendar3 me-2 text-primary"></i>Manage Timetable
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item text-danger small"
-                                       href="?delete=<?php echo intval($row['class_id']); ?>"
-                                       onclick="return confirm('Delete level?')">
-                                        <i class="bi bi-trash me-2"></i>Delete Level
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                    <h5 class="fw-bold mb-1 text-dark"><?php echo htmlspecialchars($row['name']); ?></h5>
-                    <small class="text-muted d-block mb-2">
-                        <?php echo htmlspecialchars($row['level']); ?>
-                        &middot;
-                        <?php echo htmlspecialchars($row['curriculum']); ?>
-                    </small>
-                    <span class="badge rounded-pill mt-2 px-3 py-2 class-badge" style="width: fit-content;">
-                        <i class="bi bi-people me-1"></i>
-                        <?php echo intval($row['student_count']); ?>
-                        Student<?php echo $row['student_count'] == 1 ? '' : 's'; ?>
-                    </span>
+        </section>
+    <?php else: ?>
+
+        <?php foreach ($groups as $g):
+            if (empty($g['items'])) continue;
+        ?>
+            <section class="fx-group">
+                <div class="fx-group-head">
+                    <div class="fx-group-icon"><i class="bi <?php echo $g['icon']; ?>"></i></div>
+                    <h2>
+                        <?php echo htmlspecialchars($g['title']); ?>
+                        <?php if ($g['sub']): ?><span class="sub"><?php echo htmlspecialchars($g['sub']); ?></span><?php endif; ?>
+                    </h2>
                 </div>
-            </div>
-        <?php endforeach; endif; ?>
-    </div>
+
+                <div class="fx-levels">
+                    <?php foreach ($g['items'] as $row):
+                        $students = intval($row['student_count']);
+                        $subs     = intval($row['subject_count']);
+                        $confirm  = "Delete " . $row['name'] . "?"
+                                  . ($students > 0 ? " It currently has $students student" . ($students === 1 ? '' : 's') . "." : "");
+                        $nameQ    = urlencode($row['name']);
+                    ?>
+                        <article class="fx-level">
+                            <div class="fx-level-top">
+                                <div>
+                                    <h3><?php echo htmlspecialchars($row['name']); ?></h3>
+                                    <span class="ui-badge is-soft"><?php echo htmlspecialchars($row['curriculum']); ?></span>
+                                </div>
+                                <a href="?delete=<?php echo intval($row['class_id']); ?>"
+                                   class="ui-icon is-danger" title="Delete level" aria-label="Delete <?php echo htmlspecialchars($row['name']); ?>"
+                                   onclick="return confirm(<?php echo htmlspecialchars(json_encode($confirm), ENT_QUOTES); ?>);">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </a>
+                            </div>
+
+                            <div class="fx-stats">
+                                <div class="fx-stat"><strong><?php echo $students; ?></strong><span>Student<?php echo $students === 1 ? '' : 's'; ?></span></div>
+                                <div class="fx-stat"><strong><?php echo $subs; ?></strong><span>Subject<?php echo $subs === 1 ? '' : 's'; ?></span></div>
+                            </div>
+
+                            <?php if ($subs === 0): ?>
+                                <p class="fx-hint">
+                                    <i class="bi bi-lightbulb-fill"></i>
+                                    <span>No subjects yet. <a href="subjects.php?form=<?php echo $nameQ; ?>">Add subjects</a> first, then build the timetable.</span>
+                                </p>
+                            <?php endif; ?>
+
+                            <div class="fx-level-actions">
+                                <a class="ui-btn is-primary" href="manage_timetable.php?form=<?php echo $nameQ; ?>">
+                                    <i class="bi bi-calendar3"></i> Build timetable
+                                </a>
+                                <div class="row2">
+                                    <a class="ui-btn is-ghost is-sm" href="subjects.php?form=<?php echo $nameQ; ?>">
+                                        <i class="bi bi-journal-bookmark"></i> Subjects
+                                    </a>
+                                    <a class="ui-btn is-ghost is-sm" href="exams.php?form=<?php echo $nameQ; ?>">
+                                        <i class="bi bi-calendar-check"></i> Exams
+                                    </a>
+                                </div>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endforeach; ?>
+
+    <?php endif; ?>
 </main>
 
 <!-- Add Level Modal -->
-<div class="modal fade" id="addFormModal" tabindex="-1">
+<div class="modal fade" id="addFormModal" tabindex="-1" aria-labelledby="addFormTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content ui-modal">
             <div class="modal-header">
-                <h5 class="fw-bold mb-0">New Academic Level</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="addFormTitle">New academic level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post">
                 <div class="modal-body">
-                    <label class="form-label">Level Name</label>
-                    <input type="text" name="form_name" class="form-control" placeholder="e.g. Form 1 or Grade 7" required>
-                    <p class="text-muted small mt-2 mb-0">
-                        The system will automatically classify it as <strong>Primary (CBC)</strong> or <strong>Secondary (8-4-4)</strong> based on the name.
+                    <div class="ui-field">
+                        <label for="form_name">Level name</label>
+                        <input type="text" name="form_name" id="form_name" class="form-control ui-input"
+                               placeholder="e.g. Form 1 or Grade 7" autocomplete="off" required>
+                    </div>
+
+                    <p class="fx-chip-label">Or pick one:</p>
+                    <div class="fx-chips">
+                        <?php foreach ($suggested as $sname):
+                            $taken = in_array(strtolower($sname), $existing, true);
+                        ?>
+                            <button type="button" class="fx-chip" data-name="<?php echo htmlspecialchars($sname); ?>"
+                                    <?php echo $taken ? 'disabled title="Already created"' : ''; ?>>
+                                <?php echo htmlspecialchars($sname); ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <p class="fx-note">
+                        Names containing "Form" are set up as <strong>Secondary (8-4-4)</strong>.
+                        Anything else, such as "Grade 7", is set up as <strong>Primary (CBC)</strong>.
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_form" class="btn btn-primary rounded-pill px-4 fw-bold">
-                        <i class="bi bi-plus-circle me-1"></i> Create Level
+                    <button type="button" class="ui-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add_form" class="ui-btn is-primary">
+                        <i class="bi bi-plus-circle"></i> Create level
                     </button>
                 </div>
             </form>
@@ -305,5 +409,17 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 </div>
 
 <?php include("footer.php"); ?>
+
+<script>
+    // Quick-add chips fill the name box
+    const nameInput = document.getElementById('form_name');
+    document.querySelectorAll('.fx-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            nameInput.value = chip.dataset.name;
+            nameInput.focus();
+        });
+    });
+    document.getElementById('addFormModal').addEventListener('shown.bs.modal', () => nameInput.focus());
+</script>
 </body>
 </html>

@@ -1,20 +1,47 @@
 <?php
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 1); // Temporarily on so we can see issues
 require_once("adminOnly.php");
 include('../database/db_connect.php');
 
 $message = '';
 $message_type = '';
 
-// Fetch current settings (single-row table, id = 1)
-$settings = [];
-$res = $conn->query("SELECT * FROM system_settings WHERE id = 1 LIMIT 1");
-if ($res && $res->num_rows > 0) {
-    $settings = $res->fetch_assoc();
+// ---- 1. Ensure the table and columns exist (Auto-fix) ----
+$conn->query("
+CREATE TABLE IF NOT EXISTS `system_settings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `school_name` varchar(255) DEFAULT 'My School',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+");
+
+// Check for missing columns and add them dynamically
+$required_columns = [
+    'school_email'  => "VARCHAR(255) DEFAULT NULL",
+    'logo_path'     => "VARCHAR(255) DEFAULT NULL",
+    'motto'         => "VARCHAR(255) DEFAULT NULL",
+    'address'       => "VARCHAR(255) DEFAULT NULL",
+    'phone'         => "VARCHAR(50) DEFAULT NULL",
+    'website'       => "VARCHAR(255) DEFAULT NULL",
+    'academic_year' => "VARCHAR(20) DEFAULT NULL",
+    'current_term'  => "VARCHAR(20) DEFAULT 'Term 1'",
+    'currency'      => "VARCHAR(10) DEFAULT 'KES'"
+];
+
+$check_cols = $conn->query("SHOW COLUMNS FROM system_settings");
+$existing_cols = [];
+while ($col = $check_cols->fetch_assoc()) {
+    $existing_cols[] = $col['Field'];
 }
 
-// Handle form submission
+foreach ($required_columns as $col_name => $col_def) {
+    if (!in_array($col_name, $existing_cols)) {
+        $conn->query("ALTER TABLE system_settings ADD COLUMN `$col_name` $col_def");
+    }
+}
+
+// ---- 2. Handle Form Submission ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     $school_name   = trim($_POST['school_name']   ?? '');
     $school_email  = trim($_POST['school_email']  ?? '');
@@ -34,8 +61,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         $message = "Please enter a valid school email address.";
         $message_type = 'warning';
     } else {
-        if (!empty($settings)) {
-            // Update existing row
+        // Check if row 1 exists
+        $check_row = $conn->query("SELECT id FROM system_settings WHERE id = 1");
+        
+        if ($check_row && $check_row->num_rows > 0) {
+            // Update
             $upd = $conn->prepare("
                 UPDATE system_settings
                 SET school_name = ?, school_email = ?, logo_path = ?, motto = ?, address = ?, phone = ?, website = ?, academic_year = ?, current_term = ?, currency = ?
@@ -46,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
                 $school_name, $school_email, $logo_path, $motto, $address, $phone, $website, $academic_year, $current_term, $currency
             );
         } else {
-            // Insert first row
+            // Insert
             $upd = $conn->prepare("
                 INSERT INTO system_settings
                 (id, school_name, school_email, logo_path, motto, address, phone, website, academic_year, current_term, currency)
@@ -61,15 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         if ($upd->execute()) {
             $message = "Settings saved successfully!";
             $message_type = 'success';
-            // Refresh the form
-            $res = $conn->query("SELECT * FROM system_settings WHERE id = 1 LIMIT 1");
-            if ($res && $res->num_rows > 0) $settings = $res->fetch_assoc();
         } else {
             $message = "Failed to save: " . htmlspecialchars($upd->error);
             $message_type = 'danger';
         }
         $upd->close();
     }
+}
+
+// ---- 3. Fetch current settings ----
+$settings = [];
+$res = $conn->query("SELECT * FROM system_settings WHERE id = 1 LIMIT 1");
+if ($res && $res->num_rows > 0) {
+    $settings = $res->fetch_assoc();
 }
 
 $active_page = 'settings';
@@ -87,77 +121,13 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --sidebar-bg: #34445c;
-            --sidebar-header: #dee2e6;
-            --primary-blue: #1a3066;
-            --sidebar-width: 260px;
-        }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; z-index: 1200; transition: all 0.3s ease; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-
-        .sidebar-header { background: var(--sidebar-header); padding: 12px 20px; display: flex; align-items: center; gap: 12px; height: 70px; }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; }
-
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link { color: #d1d5db; padding: 15px 20px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; text-decoration: none; transition: 0.2s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
-
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        #hamburger { color: #34445c; cursor: pointer; font-size: 1.8rem; }
-
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .adm-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .form-control, .form-select {
-            border-radius: 12px; padding: 12px 15px;
-            border: 1px solid #e2e8f0; background-color: #f8fafc;
-            font-size: 0.9rem; transition: all 0.2s;
-        }
-        .form-control:focus, .form-select:focus {
-            box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12);
-            border-color: var(--primary-blue);
-            background: #fff;
-        }
-        .btn-primary {
-            background: var(--primary-blue); border: none;
-            padding: 12px 25px; border-radius: 12px;
-            font-weight: 700; transition: 0.3s;
-        }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-
-        .section-heading {
-            border-left: 4px solid #f6b612;
-            padding-left: 15px;
-            margin-bottom: 20px;
-        }
-        .section-heading h6 {
-            font-weight: 800;
-            color: #1e293b;
-            margin: 0;
-            font-size: 0.95rem;
-        }
-
         /* Logo preview */
         .logo-preview {
-            width: 96px; height: 96px;
+            width: 96px; 
+            height: 96px;
             border-radius: 16px;
-            background: #f8fafc;
-            border: 2px dashed #cbd5e1;
+            background: var(--bg-light);
+            border: 2px dashed var(--line);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -168,15 +138,6 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
             max-height: 100%;
             object-fit: contain;
         }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
     </style>
 </head>
 <body>
@@ -186,37 +147,40 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
 <main class="main-content">
 
-    <div class="mb-4">
-        <h2 class="fw-bold mb-1">System Settings</h2>
-        <p class="text-muted small mb-0">Configure school-wide information used across the entire portal</p>
+    <div class="ui-head">
+        <div>
+            <h1>System Settings</h1>
+            <p>Configure school-wide information used across the entire portal</p>
+        </div>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4">
-            <?php echo $message; ?>
+        <div class="ui-alert is-<?php echo $message_type; ?>">
+            <i class="bi bi-info-circle-fill"></i>
+            <div><?php echo $message; ?></div>
         </div>
     <?php endif; ?>
 
-    <form method="POST" class="card adm-card p-4 p-md-5">
+    <form method="POST" class="panel p-4 p-md-5">
 
         <!-- Section: School Identity -->
         <div class="row g-4 mb-5">
             <div class="col-12">
-                <div class="section-heading">
-                    <h6>School Identity</h6>
+                <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                    <h5 class="fw-bold mb-0" style="color: var(--primary);">School Identity</h5>
                 </div>
             </div>
 
-            <div class="col-md-8">
-                <label class="form-label">School Name</label>
-                <input type="text" name="school_name" class="form-control"
+            <div class="col-md-8 ui-field">
+                <label>School Name</label>
+                <input type="text" name="school_name" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['school_name'] ?? ''); ?>"
                        placeholder="e.g. The Michaelson School" required>
             </div>
 
-            <div class="col-md-4">
-                <label class="form-label">Currency</label>
-                <select name="currency" class="form-select">
+            <div class="col-md-4 ui-field">
+                <label>Currency</label>
+                <select name="currency" class="ui-input form-select">
                     <?php $cur = $settings['currency'] ?? 'KES'; ?>
                     <option value="KES" <?php echo $cur === 'KES' ? 'selected' : ''; ?>>KES (Kenyan Shilling)</option>
                     <option value="USD" <?php echo $cur === 'USD' ? 'selected' : ''; ?>>USD (US Dollar)</option>
@@ -227,58 +191,58 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                 </select>
             </div>
 
-            <div class="col-12">
-                <label class="form-label">Motto / Tagline</label>
-                <input type="text" name="motto" class="form-control"
+            <div class="col-12 ui-field">
+                <label>Motto / Tagline</label>
+                <input type="text" name="motto" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['motto'] ?? ''); ?>"
                        placeholder="e.g. Higher Is The Goal">
             </div>
 
-            <div class="col-md-4">
-                <label class="form-label">Logo</label>
+            <div class="col-md-4 ui-field">
+                <label>Logo</label>
                 <div class="logo-preview mb-2">
                     <img src="../<?php echo htmlspecialchars($settings['logo_path'] ?? 'images/logo.jpg'); ?>"
                          alt="School Logo" onerror="this.style.display='none'">
                 </div>
-                <input type="text" name="logo_path" class="form-control form-control-sm"
+                <input type="text" name="logo_path" class="ui-input form-control-sm"
                        value="<?php echo htmlspecialchars($settings['logo_path'] ?? 'images/logo.jpg'); ?>"
                        placeholder="images/logo.jpg">
-                <small class="text-muted">Path relative to the project root.</small>
+                <small class="text-muted mt-1 d-block">Path relative to the project root.</small>
             </div>
         </div>
 
         <!-- Section: Contact Information -->
         <div class="row g-4 mb-5">
             <div class="col-12">
-                <div class="section-heading">
-                    <h6>Contact Information</h6>
+                <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                    <h5 class="fw-bold mb-0" style="color: var(--primary);">Contact Information</h5>
                 </div>
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Contact Email</label>
-                <input type="email" name="school_email" class="form-control"
+            <div class="col-md-6 ui-field">
+                <label>Contact Email</label>
+                <input type="email" name="school_email" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['school_email'] ?? ''); ?>"
                        placeholder="info@school.ac.ke" required>
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Phone Number</label>
-                <input type="text" name="phone" class="form-control"
+            <div class="col-md-6 ui-field">
+                <label>Phone Number</label>
+                <input type="text" name="phone" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['phone'] ?? ''); ?>"
                        placeholder="+254 700 000 000">
             </div>
 
-            <div class="col-12">
-                <label class="form-label">Physical Address</label>
-                <input type="text" name="address" class="form-control"
+            <div class="col-12 ui-field">
+                <label>Physical Address</label>
+                <input type="text" name="address" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['address'] ?? ''); ?>"
                        placeholder="e.g. P.O. Box 1234, Nairobi, Kenya">
             </div>
 
-            <div class="col-12">
-                <label class="form-label">Website (optional)</label>
-                <input type="text" name="website" class="form-control"
+            <div class="col-12 ui-field">
+                <label>Website (optional)</label>
+                <input type="text" name="website" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['website'] ?? ''); ?>"
                        placeholder="https://school.ac.ke">
             </div>
@@ -287,21 +251,21 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
         <!-- Section: Academic Settings -->
         <div class="row g-4 mb-5">
             <div class="col-12">
-                <div class="section-heading">
-                    <h6>Academic Settings</h6>
+                <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                    <h5 class="fw-bold mb-0" style="color: var(--primary);">Academic Settings</h5>
                 </div>
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Academic Year</label>
-                <input type="text" name="academic_year" class="form-control"
+            <div class="col-md-6 ui-field">
+                <label>Academic Year</label>
+                <input type="text" name="academic_year" class="ui-input"
                        value="<?php echo htmlspecialchars($settings['academic_year'] ?? ''); ?>"
                        placeholder="e.g. 2025/2026">
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Current Term</label>
-                <select name="current_term" class="form-select">
+            <div class="col-md-6 ui-field">
+                <label>Current Term</label>
+                <select name="current_term" class="ui-input form-select">
                     <?php $term = $settings['current_term'] ?? 'Term 1'; ?>
                     <option value="Term 1" <?php echo $term === 'Term 1' ? 'selected' : ''; ?>>Term 1</option>
                     <option value="Term 2" <?php echo $term === 'Term 2' ? 'selected' : ''; ?>>Term 2</option>
@@ -312,14 +276,14 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
         <!-- Actions -->
         <div class="d-flex justify-content-between align-items-center pt-4 border-top flex-wrap gap-2">
-            <small class="text-muted">
-                <i class="bi bi-info-circle me-1"></i>
+            <small class="text-muted fw-medium">
+                <i class="bi bi-info-circle-fill me-1 text-primary"></i>
                 Changes apply instantly across the whole portal.
             </small>
             <div class="d-flex gap-2">
-                <button type="reset" class="btn btn-light border rounded-pill px-4">Discard</button>
-                <button type="submit" name="save_settings" class="btn btn-primary rounded-pill px-5">
-                    <i class="bi bi-save me-1"></i>Save Configuration
+                <button type="reset" class="ui-btn is-ghost">Discard</button>
+                <button type="submit" name="save_settings" class="ui-btn is-primary">
+                    <i class="bi bi-save"></i> Save Configuration
                 </button>
             </div>
         </div>

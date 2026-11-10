@@ -75,7 +75,6 @@ if (isset($_POST['assign_details'])) {
 if (isset($_POST['delete_id'])) {
     $did = intval($_POST['delete_id']);
 
-    // Get user_id to delete linked user account
     $get_user = $conn->prepare("SELECT user_id FROM teachers WHERE teacher_id = ?");
     $get_user->bind_param("i", $did);
     $get_user->execute();
@@ -85,16 +84,12 @@ if (isset($_POST['delete_id'])) {
 
     $conn->begin_transaction();
     try {
-        // Delete assignments
         $conn->query("DELETE FROM teacher_assignments WHERE teacher_id = $did");
-        
-        // Delete teacher
         $stmt1 = $conn->prepare("DELETE FROM teachers WHERE teacher_id = ?");
         $stmt1->bind_param("i", $did);
         $stmt1->execute();
         $stmt1->close();
 
-        // Delete user
         if ($uid > 0) {
             $stmt2 = $conn->prepare("DELETE FROM users WHERE user_id = ?");
             $stmt2->bind_param("i", $uid);
@@ -119,7 +114,6 @@ if ($s_res) {
         $tid = $row['teacher_id'];
         $row['assignments'] = [];
         
-        // Fetch their specific pairs
         $a_res = $conn->query("
             SELECT ta.class_name, ta.subject_id, s.subject_name 
             FROM teacher_assignments ta 
@@ -159,46 +153,111 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root { --sidebar-bg: #34445c; --sidebar-header: #dee2e6; --primary-blue: #1a3066; --sidebar-width: 260px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; z-index: 1200; transition: all 0.3s ease; overflow-y: auto; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: var(--sidebar-header); padding: 12px 20px; display: flex; align-items: center; gap: 12px; height: 70px; }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; }
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link { color: #d1d5db; padding: 15px 20px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; text-decoration: none; transition: 0.2s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .table th, .table td { white-space: nowrap; width: 1%; }
-        .table td.ps-4 { width: auto; white-space: normal; }
-
-        .avatar-circle { width: 40px; height: 40px; background: #e2e8f0; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
-        
-        /* Modal Assignment Builder */
-        .assign-builder { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
-        .assign-list { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; }
-        .assign-item { display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
-        .remove-assign { color: #ef4444; cursor: pointer; background: none; border: none; font-size: 1.1rem; }
-        select[multiple] { min-height: 100px; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
+        .sf-person { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+        .sf-avatar {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--primary);
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 800;
         }
+
+        /* what a teacher teaches, one line per form */
+        .sf-teaches { min-width: 240px; max-width: 360px; }
+        .sf-line {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 3px 0;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .sf-line .ui-badge { flex-shrink: 0; }
+        .sf-line span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sf-more { font-size: 0.8rem; font-weight: 700; color: var(--primary); }
+
+        /* ---------- Assignment builder in the pop-up ---------- */
+        .sf-step {
+            margin: 22px 0 0;
+            padding-top: 22px;
+            border-top: 1px solid var(--line);
+        }
+        .sf-step h3 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; color: var(--primary); }
+        .sf-step p.sub { margin: 0 0 14px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+
+        .sf-builder {
+            padding: 16px;
+            border-radius: 18px;
+            background: var(--bg-light);
+            border: 1px solid var(--line);
+        }
+        .sf-picks { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+        .sf-pick { position: relative; }
+        .sf-pick input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+        .sf-pick span {
+            display: inline-block;
+            padding: 8px 14px;
+            border: 1.5px solid var(--line);
+            border-radius: 99px;
+            background: var(--white);
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .sf-pick input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--white); }
+        .sf-pick input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+        .sf-pick-note { margin: 12px 0; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        .sf-pick-note a { color: var(--primary); font-weight: 800; }
+        .sf-builder-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+        .sf-current { margin-top: 18px; }
+        .sf-group {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--line);
+        }
+        .sf-group:last-child { border-bottom: none; }
+        .sf-group > .ui-badge { margin-top: 5px; }
+        .sf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sf-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px 6px 12px;
+            border-radius: 99px;
+            background: var(--primary-tint);
+            color: var(--primary);
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+        .sf-chip button {
+            width: 20px;
+            height: 20px;
+            display: grid;
+            place-items: center;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--primary);
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+        .sf-chip button:hover { background: #fdeaea; color: #b42318; }
+        .sf-empty { margin: 0; font-size: 0.88rem; font-weight: 600; font-style: italic; color: var(--text-muted); }
+
+        /* Multi-select styling */
+        select[multiple] { min-height: 120px; background-image: none; }
+        select[multiple] option { padding: 8px 12px; border-radius: 6px; margin-bottom: 2px; }
+        select[multiple] option:checked { background-color: var(--primary) !important; color: white !important; }
     </style>
 </head>
 <body>
@@ -208,170 +267,118 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Staff Directory</h2>
-            <p class="text-muted small mb-0">Manage faculty profiles and class/subject assignments</p>
+            <h1>Staff directory</h1>
+            <p>Manage faculty profiles and which subjects each teacher takes in each form</p>
         </div>
-        <a href="staff_register.php" class="btn btn-dark rounded-pill px-4">
-            <i class="bi bi-person-plus-fill me-2"></i>Register Staff
-        </a>
+        <div class="ui-actions">
+            <a href="add_staff.php" class="ui-btn is-primary">
+                <i class="bi bi-person-plus-fill"></i> Register staff
+            </a>
+        </div>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 p-3 mb-4">
-            <?php echo $message; ?>
+        <div class="ui-alert is-<?php echo htmlspecialchars($message_type); ?>" role="alert">
+            <i class="bi bi-info-circle-fill"></i>
+            <span><?php echo $message; ?></span>
         </div>
     <?php endif; ?>
 
-    <div class="card p-0 overflow-hidden">
+    <section class="panel is-flush">
+        <div class="ui-panel-head">
+            <div class="ui-panel-title">
+                <h2>Faculty</h2>
+                <span class="ui-count"><?php echo count($staff); ?> member<?php echo count($staff) === 1 ? '' : 's'; ?></span>
+            </div>
+            <?php if (!empty($staff)): ?>
+                <label class="ui-search">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="staffSearch" placeholder="Search staff..." aria-label="Search staff">
+                </label>
+            <?php endif; ?>
+        </div>
+
         <?php if (empty($staff)): ?>
-            <div class="p-5 text-center">
-                <i class="bi bi-people fs-1 text-muted d-block mb-3"></i>
-                <h5 class="fw-bold text-muted">No staff members yet</h5>
-                <p class="text-muted mb-3">Click <strong>Register Staff</strong> to add the first one.</p>
+            <div class="ui-empty">
+                <i class="bi bi-people"></i>
+                <p>No staff members yet</p>
+                <small>Click <strong>Register staff</strong> to add the first one.</small>
             </div>
         <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
+            <div class="ui-table-wrap">
+                <table class="ui-table" id="staffTable">
+                    <thead>
                         <tr>
-                            <th class="ps-4 py-3 text-muted small text-uppercase">Staff Member</th>
-                            <th class="text-muted small text-uppercase">Employee ID</th>
-                            <th class="text-muted small text-uppercase">Experience</th>
-                            <th class="text-muted small text-uppercase">Assignments</th>
-                            <th class="text-center text-muted small text-uppercase">Actions</th>
+                            <th>Staff member</th>
+                            <th>Employee ID</th>
+                            <th>Experience</th>
+                            <th>Teaches</th>
+                            <th class="is-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($staff as $row): ?>
+                        <?php foreach ($staff as $row):
+                            $tid = intval($row['teacher_id']);
+                            $classes_taught = [];
+                            foreach ($row['assignments'] as $a) {
+                                $classes_taught[$a['class_name']][$a['subject_name']] = true;
+                            }
+                            $shown = 0;
+                        ?>
                             <tr>
-                                <td class="ps-4">
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-circle me-3">
-                                            <?php echo htmlspecialchars(strtoupper(substr($row['full_name'] ?? '?', 0, 1))); ?>
-                                        </div>
+                                <td>
+                                    <div class="sf-person">
+                                        <span class="sf-avatar" aria-hidden="true"><?php echo htmlspecialchars(strtoupper(substr($row['full_name'] ?? '?', 0, 2))); ?></span>
                                         <div>
-                                            <div class="fw-bold"><?php echo htmlspecialchars($row['full_name'] ?? ''); ?></div>
-                                            <div class="text-muted" style="font-size: 0.75rem;">
-                                                Staff ID: #<?php echo intval($row['teacher_id']); ?>
-                                            </div>
+                                            <span class="ui-name"><?php echo htmlspecialchars($row['full_name'] ?? ''); ?></span>
+                                            <span class="ui-sub">Staff ID: #<?php echo $tid; ?></span>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="fw-semibold text-dark">
-                                        <?php echo !empty($row['employee_id']) ? htmlspecialchars($row['employee_id']) : 'N/A'; ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="text-muted small fw-bold">
-                                        <?php echo !empty($row['experience']) ? htmlspecialchars($row['experience']) : '0 Years'; ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php if (empty($row['assignments'])): ?>
-                                        <span class="badge bg-light text-muted border">Not Assigned</span>
+                                    <?php if (!empty($row['employee_id'])): ?>
+                                        <span class="ui-badge is-navy"><?php echo htmlspecialchars($row['employee_id']); ?></span>
                                     <?php else: ?>
-                                        <div class="d-flex flex-wrap gap-1" style="max-width: 250px;">
-                                            <?php foreach ($row['assignments'] as $a): ?>
-                                                <span class="badge bg-primary-subtle text-primary border px-2 py-1" style="font-size: 0.7rem;">
-                                                    <?php echo htmlspecialchars($a['class_name'] . ' - ' . $a['subject_name']); ?>
-                                                </span>
+                                        <span class="ui-badge is-soft">N/A</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="nowrap"><?php echo !empty($row['experience']) ? htmlspecialchars($row['experience']) : '0 Years'; ?></td>
+                                <td>
+                                    <?php if (empty($classes_taught)): ?>
+                                        <span class="ui-badge is-soft">Not assigned</span>
+                                    <?php else: ?>
+                                        <div class="sf-teaches">
+                                            <?php foreach ($classes_taught as $cls => $names):
+                                                if ($shown >= 3) break;
+                                                $shown++;
+                                            ?>
+                                                <div class="sf-line">
+                                                    <span class="ui-badge is-gold"><?php echo htmlspecialchars($cls); ?></span>
+                                                    <span title="<?php echo htmlspecialchars(implode(', ', array_keys($names))); ?>">
+                                                        <?php echo htmlspecialchars(implode(', ', array_keys($names))); ?>
+                                                    </span>
+                                                </div>
                                             <?php endforeach; ?>
+                                            <?php if (count($classes_taught) > 3): ?>
+                                                <span class="sf-more">+ <?php echo count($classes_taught) - 3; ?> more form<?php echo count($classes_taught) - 3 === 1 ? '' : 's'; ?></span>
+                                            <?php endif; ?>
                                         </div>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <button class="btn btn-sm btn-outline-primary border-0 rounded-circle"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#assignModal<?php echo intval($row['teacher_id']); ?>">
+                                <td class="is-center">
+                                    <div class="ui-row-actions" style="justify-content:center;">
+                                        <button type="button" class="ui-icon" title="Edit staff" aria-label="Edit <?php echo htmlspecialchars($row['full_name'] ?? ''); ?>"
+                                                onclick="openStaff(<?php echo $tid; ?>)">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
-                                        <form method="post" onsubmit="return confirm('Remove this staff member?');" class="d-inline">
-                                            <input type="hidden" name="delete_id" value="<?php echo intval($row['teacher_id']); ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle">
-                                                <i class="bi bi-trash3"></i>
+                                        <form method="post" style="margin:0;" onsubmit="return confirm('Remove this staff member?');">
+                                            <input type="hidden" name="delete_id" value="<?php echo $tid; ?>">
+                                            <button type="submit" class="ui-icon is-danger" title="Remove staff" aria-label="Remove <?php echo htmlspecialchars($row['full_name'] ?? ''); ?>">
+                                                <i class="bi bi-trash3-fill"></i>
                                             </button>
                                         </form>
-                                    </div>
-
-                                    <!-- Assignment Modal -->
-                                    <div class="modal fade" id="assignModal<?php echo intval($row['teacher_id']); ?>" tabindex="-1">
-                                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                                            <div class="modal-content border-0 shadow rounded-4 text-start">
-                                                <form method="post" onsubmit="return validateForm(<?php echo intval($row['teacher_id']); ?>)">
-                                                    <div class="modal-header border-0 pb-0">
-                                                        <h5 class="fw-bold mb-0">Edit Staff: <?php echo htmlspecialchars($row['full_name'] ?? ''); ?></h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body py-4">
-                                                        <input type="hidden" name="staff_id" value="<?php echo intval($row['teacher_id']); ?>">
-
-                                                        <div class="row g-3 mb-4">
-                                                            <div class="col-md-6">
-                                                                <label class="form-label small fw-bold">Employee ID</label>
-                                                                <input type="text" name="employee_id" class="form-control bg-light border-0"
-                                                                       value="<?php echo htmlspecialchars($row['employee_id'] ?? ''); ?>" required>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label small fw-bold">Years of Experience</label>
-                                                                <input type="text" name="experience" class="form-control bg-light border-0"
-                                                                       value="<?php echo htmlspecialchars($row['experience'] ?? ''); ?>" placeholder="e.g. 5 Years" required>
-                                                            </div>
-                                                        </div>
-
-                                                        <hr class="opacity-25 mb-4">
-
-                                                        <!-- Assignment Builder inside Modal -->
-                                                        <label class="form-label small fw-bold mb-2">Class & Subject Assignments</label>
-                                                        
-                                                        <div class="assign-builder mb-3">
-                                                            <div class="row g-2 align-items-end mb-3">
-                                                                <div class="col-md-4">
-                                                                    <select id="class_<?php echo $row['teacher_id']; ?>" class="form-select form-select-sm">
-                                                                        <option value="" disabled selected>-- Choose Class --</option>
-                                                                        <?php foreach ($forms_list as $form): ?>
-                                                                            <option value="<?php echo htmlspecialchars($form); ?>"><?php echo htmlspecialchars($form); ?></option>
-                                                                        <?php endforeach; ?>
-                                                                    </select>
-                                                                </div>
-                                                                <div class="col-md-5">
-                                                                    <select id="subject_<?php echo $row['teacher_id']; ?>" class="form-select form-select-sm" multiple size="1">
-                                                                        <?php foreach ($subjects_list as $sub): ?>
-                                                                            <option value="<?php echo intval($sub['subject_id']); ?>" data-name="<?php echo htmlspecialchars($sub['subject_name']); ?>">
-                                                                                <?php echo htmlspecialchars($sub['subject_name']); ?>
-                                                                            </option>
-                                                                        <?php endforeach; ?>
-                                                                    </select>
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <button type="button" class="btn btn-sm btn-warning w-100 fw-bold" onclick="addAssign(<?php echo $row['teacher_id']; ?>)">
-                                                                        <i class="bi bi-plus-lg"></i> Add
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            <!-- Hidden JSON -->
-                                                            <input type="hidden" name="assignments_json" id="json_<?php echo $row['teacher_id']; ?>" 
-                                                                   value='<?php echo htmlspecialchars(json_encode(array_map(function($a) {
-                                                                       return ['class' => $a['class_name'], 'subject' => $a['subject_id'], 'subjectName' => $a['subject_name']];
-                                                                   }, $row['assignments']))); ?>'>
-
-                                                            <ul class="assign-list" id="list_<?php echo $row['teacher_id']; ?>">
-                                                                <!-- Rendered by JS -->
-                                                            </ul>
-                                                        </div>
-
-                                                    </div>
-                                                    <div class="modal-footer border-0 pt-0">
-                                                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" name="assign_details" class="btn btn-dark rounded-pill px-4">Save Changes</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -380,98 +387,187 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                 </table>
             </div>
         <?php endif; ?>
-    </div>
+    </section>
 
 </main>
+
+<!-- One edit pop-up for everyone -->
+<div class="modal fade" id="staffModal" tabindex="-1" aria-labelledby="staffModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content ui-modal">
+            <form method="post" id="staffForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="staffModalTitle">Edit staff</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="staff_id" id="f_staff_id">
+                    <input type="hidden" name="assignments_json" id="f_json" value="[]">
+
+                    <div class="ui-form-grid">
+                        <div class="ui-field">
+                            <label for="f_employee">Employee ID</label>
+                            <input type="text" name="employee_id" id="f_employee" class="form-control ui-input" required>
+                        </div>
+                        <div class="ui-field">
+                            <label for="f_experience">Years of experience</label>
+                            <input type="text" name="experience" id="f_experience" class="form-control ui-input" placeholder="e.g. 5 Years" required>
+                        </div>
+                    </div>
+
+                    <div class="sf-step">
+                        <h3>What they teach</h3>
+                        <p class="sub">Select a class, then select one or more subjects using <strong>Ctrl</strong> (or Cmd on Mac) and click Add.</p>
+
+                        <div class="sf-builder">
+                            <div class="row g-3 align-items-end mb-3">
+                                <div class="col-md-4 ui-field">
+                                    <label>Select Class</label>
+                                    <select id="selectClass" class="ui-input form-select">
+                                        <option value="" disabled selected>-- Choose Class --</option>
+                                        <?php foreach ($forms_list as $fm): ?>
+                                            <option value="<?php echo htmlspecialchars($fm); ?>"><?php echo htmlspecialchars($fm); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 ui-field">
+                                    <label>Select Subject(s)</label>
+                                    <select id="selectSubject" class="ui-input form-select" multiple>
+                                        <?php foreach ($subjects_list as $sub): ?>
+                                            <option value="<?php echo intval($sub['subject_id']); ?>" data-name="<?php echo htmlspecialchars($sub['subject_name']); ?>">
+                                                <?php echo htmlspecialchars($sub['subject_name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="ui-btn is-primary w-100 py-3" onclick="addAssignment()">
+                                        <i class="bi bi-plus-lg"></i> Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="sf-current" id="f_current">
+                                <!-- Rendered by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ui-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="assign_details" class="ui-btn is-primary">
+                        <i class="bi bi-check-lg"></i> Save changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php include("footer.php"); ?>
 
 <script>
-    // Store assignments per teacher ID
-    const teacherAssignments = {};
+    const staffData       = <?php echo json_encode($staff, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
-    // Initialize data from hidden inputs when page loads
-    document.addEventListener('DOMContentLoaded', () => {
-        <?php foreach ($staff as $row): ?>
-            teacherAssignments[<?php echo $row['teacher_id']; ?>] = JSON.parse(document.getElementById('json_<?php echo $row['teacher_id']; ?>').value || '[]');
-            renderList(<?php echo $row['teacher_id']; ?>);
-        <?php endforeach; ?>
-    });
+    const modalEl = document.getElementById('staffModal');
+    const modal   = new bootstrap.Modal(modalEl);
+    let assignments = [];   
 
-    function addAssign(teacherId) {
-        const classSelect = document.getElementById('class_' + teacherId);
-        const subjectSelect = document.getElementById('subject_' + teacherId);
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function openStaff(id) {
+        const t = staffData.find(s => s.teacher_id == id);
+        if (!t) return;
         
+        document.getElementById('staffModalTitle').textContent = 'Edit staff: ' + t.full_name;
+        document.getElementById('f_staff_id').value   = t.teacher_id;
+        document.getElementById('f_employee').value   = t.employee_id;
+        document.getElementById('f_experience').value = t.experience;
+        
+        // Map existing DB assignments to the JS array format
+        assignments = (t.assignments || []).map(a => ({ 
+            class: a.class_name, 
+            subject: parseInt(a.subject_id, 10), 
+            subjectName: a.subject_name 
+        }));
+
+        document.getElementById('selectClass').value = '';
+        document.getElementById('selectSubject').value = '';
+        
+        renderCurrent();
+        modal.show();
+    }
+
+    function addAssignment() {
+        const classSelect = document.getElementById('selectClass');
+        const subjectSelect = document.getElementById('selectSubject');
         const selectedClass = classSelect.value;
         const selectedOptions = Array.from(subjectSelect.selectedOptions);
 
-        if (!selectedClass) { alert('Select a class first.'); return; }
-        if (selectedOptions.length === 0) { alert('Select at least one subject.'); return; }
+        if (!selectedClass) { alert('Please select a class first.'); return; }
+        if (selectedOptions.length === 0) { alert('Please select at least one subject.'); return; }
 
-        let dupes = 0;
+        let addedCount = 0;
+        let duplicateCount = 0;
+
         selectedOptions.forEach(opt => {
             const subId = opt.value;
             const subName = opt.getAttribute('data-name');
-
-            const exists = teacherAssignments[teacherId].find(a => a.class === selectedClass && a.subject === subId);
+            const exists = assignments.find(a => a.class === selectedClass && a.subject === subId);
+            
             if (exists) {
-                dupes++;
+                duplicateCount++;
             } else {
-                teacherAssignments[teacherId].push({ class: selectedClass, subject: subId, subjectName: subName });
+                assignments.push({ class: selectedClass, subject: subId, subjectName: subName });
+                addedCount++;
             }
         });
 
-        // Reset inputs
         classSelect.value = '';
         subjectSelect.value = '';
+        renderCurrent();
 
-        renderList(teacherId);
-        if (dupes > 0) alert(`Skipped ${dupes} duplicate assignment(s).`);
+        if (duplicateCount > 0) alert(`Skipped ${duplicateCount} subject(s) that were already assigned to ${selectedClass}.`);
     }
 
-    function removeAssign(teacherId, index) {
-        teacherAssignments[teacherId].splice(index, 1);
-        renderList(teacherId);
+    function removeAssignment(cls, name) {
+        assignments = assignments.filter(a => !(a.class === cls && a.subjectName === name));
+        renderCurrent();
     }
 
-    function renderList(teacherId) {
-        const list = document.getElementById('list_' + teacherId);
-        const jsonInput = document.getElementById('json_' + teacherId);
+    function renderCurrent() {
+        const box = document.getElementById('f_current');
+        const jsonInput = document.getElementById('f_json');
         
-        list.innerHTML = '';
-        const arr = teacherAssignments[teacherId];
+        jsonInput.value = JSON.stringify(assignments);
 
-        if (arr.length === 0) {
-            list.innerHTML = '<li class="text-muted small fst-italic">No assignments added.</li>';
-            jsonInput.value = '[]';
+        if (assignments.length === 0) {
+            box.innerHTML = '<p class="sf-empty">No subjects assigned yet.</p>';
             return;
         }
 
-        arr.forEach((item, index) => {
-            const li = document.createElement('li');
-            li.className = 'assign-item';
-            li.innerHTML = `
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-primary">${item.class}</span>
-                    <span class="fw-bold text-dark small">${item.subjectName}</span>
-                </div>
-                <button type="button" class="remove-assign" onclick="removeAssign(${teacherId}, ${index})">
-                    <i class="bi bi-x-circle-fill"></i>
-                </button>
-            `;
-            list.appendChild(li);
+        const byClass = {};
+        assignments.forEach(a => {
+            (byClass[a.class] = byClass[a.class] || new Set()).add(a.subjectName);
         });
 
-        jsonInput.value = JSON.stringify(arr);
+        box.innerHTML = Object.keys(byClass).map(cls => {
+            const chips = Array.from(byClass[cls]).map(name =>
+                `<span class="sf-chip">${esc(name)}<button type="button" onclick="removeAssignment('${esc(cls)}', '${esc(name)}')"><i class="bi bi-x-lg"></i></button></span>`
+            ).join('');
+            return `<div class="sf-group"><span class="ui-badge is-gold">${esc(cls)}</span><div class="sf-chips">${chips}</div></div>`;
+        }).join('');
     }
 
-    function validateForm(teacherId) {
-        if (teacherAssignments[teacherId].length === 0) {
-            alert('Please add at least one assignment.');
-            return false;
-        }
-        return true;
-    }
+    // Search
+    document.getElementById('staffSearch')?.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#staffTable tbody tr').forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
 </script>
 </body>
 </html>

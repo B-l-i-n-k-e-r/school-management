@@ -6,6 +6,8 @@ include('../database/db_connect.php');
 
 $message = '';
 $message_type = '';
+$terms = ['Term 1', 'Term 2', 'Term 3'];
+$active_form = null;   // which form's tab to show after the page loads
 
 // ---- Handle Adding/Updating Fee Structure ----
 if (isset($_POST['save_fee'])) {
@@ -16,6 +18,8 @@ if (isset($_POST['save_fee'])) {
     $activity = (float) ($_POST['activity'] ?? 0);
     $others   = (float) ($_POST['others'] ?? 0);
     $total    = $tuition + $boarding + $activity + $others;
+
+    $active_form = $form;
 
     if ($form === '' || $term === '') {
         $message = "Form and Term are required.";
@@ -30,7 +34,7 @@ if (isset($_POST['save_fee'])) {
 
         if ($exists) {
             $stmt = $conn->prepare("UPDATE fee_structure SET amount=?, tuition=?, boarding=?, activity=?, others=?, total_amount=? WHERE form=? AND term=?");
-            $stmt->bind_param("dddddsss", $total, $tuition, $boarding, $activity, $others, $total, $form, $term);
+            $stmt->bind_param("ddddddss", $total, $tuition, $boarding, $activity, $others, $total, $form, $term);
         } else {
             $stmt = $conn->prepare("INSERT INTO fee_structure (form, term, amount, tuition, boarding, activity, others, total_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->bind_param("ssdddddd", $form, $term, $total, $tuition, $boarding, $activity, $others, $total);
@@ -50,11 +54,20 @@ if (isset($_POST['save_fee'])) {
 // ---- Handle Delete ----
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
+
+    // remember which form it belonged to, so we come back to the same tab
+    $f_stmt = $conn->prepare("SELECT form FROM fee_structure WHERE id = ?");
+    $f_stmt->bind_param("i", $id);
+    $f_stmt->execute();
+    $f_row = $f_stmt->get_result()->fetch_assoc();
+    $f_stmt->close();
+
     $stmt = $conn->prepare("DELETE FROM fee_structure WHERE id = ?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $stmt->close();
-    header("Location: fee_structure.php?deleted=1");
+
+    header("Location: fee_structure.php?deleted=1" . ($f_row ? "&form=" . urlencode($f_row['form']) : ""));
     exit();
 }
 
@@ -70,7 +83,7 @@ if ($res) {
     while ($row = $res->fetch_assoc()) $structures[] = $row;
 }
 
-// ---- Fetch classes for dropdowns ----
+// ---- Fetch classes (these become the tabs) ----
 $classes = [];
 $c_res = $conn->query("SELECT name FROM classes ORDER BY sort_order ASC");
 if ($c_res) {
@@ -79,6 +92,35 @@ if ($c_res) {
 if (empty($classes)) {
     $classes = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
 }
+
+// Forms that appear in fee structures but not in the classes table still get a tab
+$form_names = $classes;
+foreach ($structures as $s) {
+    if (!in_array($s['form'], $form_names, true)) $form_names[] = $s['form'];
+}
+
+// ---- Arrange: form -> term -> fee row ----
+$by_form = [];
+$term_counts = [];
+foreach ($structures as $s) {
+    $by_form[$s['form']][$s['term']] = $s;
+    $term_counts[$s['form']] = ($term_counts[$s['form']] ?? 0) + 1;
+}
+
+// ---- Which tab is open ----
+if ($active_form === null) {
+    $active_form = trim($_GET['form'] ?? '');
+}
+if ($active_form !== 'all' && !in_array($active_form, $form_names, true)) {
+    $active_form = $form_names[0] ?? 'all';
+}
+
+$message_icons = [
+    'success' => 'bi-check-circle-fill',
+    'danger'  => 'bi-x-circle-fill',
+    'warning' => 'bi-exclamation-triangle-fill',
+    'info'    => 'bi-info-circle-fill',
+];
 
 $active_page = 'fee_structure';
 $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
@@ -95,69 +137,166 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --sidebar-bg: #34445c;
-            --sidebar-header: #dee2e6;
-            --primary-blue: #1a3066;
-            --sidebar-width: 260px;
+        /* ---------- Form tabs ---------- */
+        .fx-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 26px;
+            padding: 6px;
+            overflow-x: auto;
+            background: var(--white);
+            border-radius: 99px;
+            box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22);
+            scrollbar-width: thin;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
+        .fx-tab {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 99px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .fx-tab:hover { background: var(--primary-tint); color: var(--primary); }
+        .fx-tab.is-active { background: var(--primary); color: var(--white); }
+        .fx-tab .n {
+            min-width: 22px;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: var(--bg-light);
+            color: var(--primary);
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-align: center;
+        }
+        .fx-tab.is-active .n { background: var(--accent); color: var(--primary); }
 
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; z-index: 1200; transition: all 0.3s ease; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
+        /* ---------- A form's fees ---------- */
+        .fx-section { display: none; margin-bottom: 40px; }
+        .fx-section.is-visible { display: block; }
+        .fx-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .fx-section-head h2 {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--primary);
+        }
+        .fx-year {
+            padding: 5px 14px;
+            border-radius: 99px;
+            background: var(--accent-tint);
+            color: var(--accent-deep);
+            font-size: 0.8rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
 
-        .sidebar-header { background: var(--sidebar-header); padding: 12px 20px; display: flex; align-items: center; gap: 12px; height: 70px; }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; }
+        .fx-terms {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+        .fx-term {
+            display: flex;
+            flex-direction: column;
+            background: var(--white);
+            border-radius: 22px;
+            padding: 22px;
+            box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22);
+        }
+        .fx-term-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding-bottom: 14px;
+            margin-bottom: 6px;
+            border-bottom: 2px solid var(--primary-tint);
+        }
+        .fx-term-head strong { font-size: 1rem; font-weight: 800; color: var(--primary); }
+        .fx-term-head .ui-row-actions { gap: 6px; }
+        .fx-term-head .ui-icon { width: 34px; height: 34px; font-size: 0.9rem; }
+        a.ui-icon { text-decoration: none; }
 
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link { color: #d1d5db; padding: 15px 20px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; text-decoration: none; transition: 0.2s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
+        .fx-lines { list-style: none; margin: 0 0 14px; padding: 0; }
+        .fx-lines li {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .fx-lines li:last-child { border-bottom: none; }
+        .fx-lines li span:last-child { color: var(--ink); font-weight: 700; white-space: nowrap; }
+        .fx-total {
+            margin-top: auto;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: var(--primary);
+            color: var(--white);
+        }
+        .fx-total span { display: block; font-size: 0.78rem; font-weight: 700; color: rgba(255, 255, 255, 0.75); }
+        .fx-total strong { display: block; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.01em; color: var(--accent); }
 
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
+        .fx-none {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 8px;
+            padding: 22px 18px;
+            border: 2px dashed var(--line);
+            border-radius: 16px;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
 
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        #hamburger { color: #34445c; cursor: pointer; font-size: 1.8rem; }
-
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .adm-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .table th, .table td { white-space: nowrap; width: 1%; }
-        .table td.px-4, .table th.px-4 { width: auto; }
-
-        .search-area { background: white; border-radius: 20px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .form-control, .form-select { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; background-color: #f8fafc; font-size: 0.9rem; transition: all 0.2s; }
-        .form-control:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12); border-color: var(--primary-blue); background: #fff; }
-        .btn-primary { background: var(--primary-blue); border: none; padding: 14px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-
-        .modal-content { border: none; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
-        .modal-header { border: 0; padding: 24px 24px 0; }
-        .modal-body { padding: 24px; }
-        .modal-footer { border: 0; padding: 0 24px 24px; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        /* live total in the pop-up */
+        .fx-preview {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 18px;
+            padding: 14px 18px;
+            border-radius: 16px;
+            background: var(--primary-tint);
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .fx-preview strong { font-size: 1.2rem; font-weight: 800; }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
+            .fx-terms { grid-template-columns: 1fr; }
         }
-
         @media print {
-            .sidebar, .topbar, .btn, .action-col, .search-area, .sidebar-overlay { display: none !important; }
-            .main-content { margin-left: 0 !important; padding: 0 !important; }
-            .card { box-shadow: none !important; border: 1px solid #eee !important; }
+            .fx-section:not(.is-visible) { display: none !important; }
+            .fx-tabs { display: none !important; }
+            .fx-total { background: #fff !important; color: #000 !important; border: 1px solid #ccc; }
+            .fx-total span, .fx-total strong { color: #000 !important; }
         }
     </style>
 </head>
@@ -168,147 +307,173 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Fee Structure</h2>
-            <p class="text-muted small mb-0">Configure and manage mandatory school fees</p>
+            <h1>Fee structure</h1>
+            <p>Set the fees for each form, term by term</p>
         </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-dark rounded-pill px-4" onclick="window.print()">
-                <i class="bi bi-printer me-2"></i>Print
+        <div class="ui-actions no-print">
+            <button type="button" class="ui-btn is-ghost" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print
             </button>
-            <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#feeModal" onclick="resetModal()">
-                <i class="bi bi-plus-lg me-2"></i>New Structure
+            <button type="button" class="ui-btn is-primary" onclick="openFeeModal()">
+                <i class="bi bi-plus-lg"></i> New structure
             </button>
-        </div>
-    </div>
-
-    <div class="search-area">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-radius: 12px 0 0 12px;"><i class="bi bi-search"></i></span>
-                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Search by amount or keyword..." style="border-radius: 0 12px 12px 0;">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select id="filterForm" class="form-select">
-                    <option value="">All Forms</option>
-                    <?php foreach ($classes as $cname): ?>
-                        <option value="<?php echo htmlspecialchars($cname); ?>"><?php echo htmlspecialchars($cname); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select id="filterTerm" class="form-select">
-                    <option value="">All Terms</option>
-                    <option value="Term 1">Term 1</option>
-                    <option value="Term 2">Term 2</option>
-                    <option value="Term 3">Term 3</option>
-                </select>
-            </div>
         </div>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4"><?php echo $message; ?></div>
+        <div class="ui-alert is-<?php echo htmlspecialchars($message_type); ?>" role="alert">
+            <i class="bi <?php echo $message_icons[$message_type] ?? 'bi-info-circle-fill'; ?>"></i>
+            <span><?php echo $message; ?></span>
+        </div>
     <?php endif; ?>
 
-    <div class="card adm-card p-4">
-        <?php if (empty($structures)): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-receipt fs-1 text-muted d-block mb-3"></i>
-                <h5 class="fw-bold text-muted">No fee structure yet</h5>
-                <p class="text-muted mb-3">Click <strong>New Structure</strong> to create the first one.</p>
-            </div>
-        <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr class="text-muted small text-uppercase">
-                            <th class="ps-4">Form</th>
-                            <th>Term</th>
-                            <th class="text-end">Tuition</th>
-                            <th class="text-end">Boarding</th>
-                            <th class="text-end">Activity</th>
-                            <th class="text-end">Others</th>
-                            <th class="text-end">Total (KES)</th>
-                            <th class="text-center action-col pe-4">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($structures as $row): ?>
-                            <tr class="fee-row">
-                                <td class="ps-4 fw-bold row-form"><?php echo htmlspecialchars($row['form'] ?? ''); ?></td>
-                                <td class="row-term">
-                                    <span class="badge bg-light text-dark border px-3 py-2 rounded-pill"><?php echo htmlspecialchars($row['term'] ?? ''); ?></span>
-                                </td>
-                                <td class="text-end"><?php echo number_format((float)($row['tuition']  ?? 0), 2); ?></td>
-                                <td class="text-end"><?php echo number_format((float)($row['boarding'] ?? 0), 2); ?></td>
-                                <td class="text-end"><?php echo number_format((float)($row['activity'] ?? 0), 2); ?></td>
-                                <td class="text-end"><?php echo number_format((float)($row['others']   ?? 0), 2); ?></td>
-                                <td class="text-end fw-bold text-primary"><?php echo number_format((float)($row['total_amount'] ?? 0), 2); ?></td>
-                                <td class="text-center action-col pe-4">
-                                    <button class="btn btn-sm btn-light text-primary border-0 edit-btn"
-                                            data-bs-toggle="modal" data-bs-target="#feeModal"
-                                            data-form="<?php echo htmlspecialchars($row['form'] ?? ''); ?>"
-                                            data-term="<?php echo htmlspecialchars($row['term'] ?? ''); ?>"
-                                            data-tuition="<?php echo (float)($row['tuition']  ?? 0); ?>"
-                                            data-boarding="<?php echo (float)($row['boarding'] ?? 0); ?>"
-                                            data-activity="<?php echo (float)($row['activity'] ?? 0); ?>"
-                                            data-others="<?php echo (float)($row['others']   ?? 0); ?>">
-                                        <i class="bi bi-pencil-square fs-5"></i>
-                                    </button>
-                                    <a href="?delete=<?php echo intval($row['id']); ?>"
-                                       class="btn btn-sm btn-light text-danger border-0"
-                                       onclick="return confirm('Delete this record?');">
-                                        <i class="bi bi-trash3 fs-5"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+    <!-- One tab per form -->
+    <div class="fx-tabs" role="tablist" aria-label="Forms">
+        <button type="button" class="fx-tab" data-tab="all" role="tab">
+            All forms <span class="n"><?php echo count($structures); ?></span>
+        </button>
+        <?php foreach ($form_names as $fname): ?>
+            <button type="button" class="fx-tab" data-tab="<?php echo htmlspecialchars($fname); ?>" role="tab">
+                <?php echo htmlspecialchars($fname); ?>
+                <span class="n"><?php echo intval($term_counts[$fname] ?? 0); ?>/<?php echo count($terms); ?></span>
+            </button>
+        <?php endforeach; ?>
     </div>
+
+    <!-- A section for every form -->
+    <?php foreach ($form_names as $fname):
+        $visible = ($active_form === 'all' || $active_form === $fname);
+        $jsForm  = htmlspecialchars(json_encode($fname), ENT_QUOTES);
+
+        // terms to show: the usual three, plus any unusual ones that exist
+        $show_terms = array_values(array_unique(array_merge($terms, array_keys($by_form[$fname] ?? []))));
+
+        // what a family would pay across the terms that are set
+        $year_total = 0.0;
+        foreach (($by_form[$fname] ?? []) as $fee) $year_total += (float) ($fee['total_amount'] ?? 0);
+    ?>
+        <section class="fx-section<?php echo $visible ? ' is-visible' : ''; ?>" data-form="<?php echo htmlspecialchars($fname); ?>">
+            <div class="fx-section-head">
+                <h2>
+                    <?php echo htmlspecialchars($fname); ?>
+                    <?php if ($year_total > 0): ?>
+                        <span class="fx-year">All terms: KES <?php echo number_format($year_total, 2); ?></span>
+                    <?php endif; ?>
+                </h2>
+            </div>
+
+            <div class="fx-terms">
+                <?php foreach ($show_terms as $tname):
+                    $fee = $by_form[$fname][$tname] ?? null;
+                    $jsTerm = htmlspecialchars(json_encode($tname), ENT_QUOTES);
+                ?>
+                    <div class="fx-term">
+                        <div class="fx-term-head">
+                            <strong><?php echo htmlspecialchars($tname); ?></strong>
+                            <?php if ($fee): ?>
+                                <div class="ui-row-actions no-print">
+                                    <button type="button" class="ui-icon" title="Edit fees" aria-label="Edit fees for <?php echo htmlspecialchars($fname . ', ' . $tname); ?>"
+                                            onclick="openFeeModal(<?php echo $jsForm; ?>, <?php echo $jsTerm; ?>, {
+                                                tuition: <?php echo (float)($fee['tuition'] ?? 0); ?>,
+                                                boarding: <?php echo (float)($fee['boarding'] ?? 0); ?>,
+                                                activity: <?php echo (float)($fee['activity'] ?? 0); ?>,
+                                                others: <?php echo (float)($fee['others'] ?? 0); ?>
+                                            })">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <a href="?delete=<?php echo intval($fee['id']); ?>" class="ui-icon is-danger"
+                                       title="Delete" aria-label="Delete fees for <?php echo htmlspecialchars($fname . ', ' . $tname); ?>"
+                                       onclick="return confirm('Delete this record?');">
+                                        <i class="bi bi-trash3-fill"></i>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($fee): ?>
+                            <ul class="fx-lines">
+                                <li><span>Tuition</span><span><?php echo number_format((float)($fee['tuition'] ?? 0), 2); ?></span></li>
+                                <li><span>Boarding</span><span><?php echo number_format((float)($fee['boarding'] ?? 0), 2); ?></span></li>
+                                <li><span>Activity</span><span><?php echo number_format((float)($fee['activity'] ?? 0), 2); ?></span></li>
+                                <li><span>Others</span><span><?php echo number_format((float)($fee['others'] ?? 0), 2); ?></span></li>
+                            </ul>
+                            <div class="fx-total">
+                                <span>Total for the term (KES)</span>
+                                <strong><?php echo number_format((float)($fee['total_amount'] ?? 0), 2); ?></strong>
+                            </div>
+                        <?php else: ?>
+                            <div class="fx-none">
+                                Fees not set yet
+                                <button type="button" class="ui-btn is-primary is-sm no-print"
+                                        onclick="openFeeModal(<?php echo $jsForm; ?>, <?php echo $jsTerm; ?>)">
+                                    <i class="bi bi-plus-lg"></i> Set fees
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+    <?php endforeach; ?>
+
 </main>
 
-<div class="modal fade" id="feeModal" tabindex="-1" aria-hidden="true">
+<!-- Set / edit fees -->
+<div class="modal fade" id="feeModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content ui-modal">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="modalTitle">Add / Edit Fee Structure</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="modalTitle">Set fees</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="">
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Form</label>
-                            <select name="form" id="m_form" class="form-select" required>
-                                <?php foreach ($classes as $cname): ?>
+                    <div class="ui-form-grid">
+                        <div class="ui-field">
+                            <label for="m_form">Form</label>
+                            <select name="form" id="m_form" class="form-select ui-input" required>
+                                <?php foreach ($form_names as $cname): ?>
                                     <option value="<?php echo htmlspecialchars($cname); ?>"><?php echo htmlspecialchars($cname); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Term</label>
-                            <select name="term" id="m_term" class="form-select" required>
-                                <option value="Term 1">Term 1</option>
-                                <option value="Term 2">Term 2</option>
-                                <option value="Term 3">Term 3</option>
+                        <div class="ui-field">
+                            <label for="m_term">Term</label>
+                            <select name="term" id="m_term" class="form-select ui-input" required>
+                                <?php foreach ($terms as $tname): ?>
+                                    <option value="<?php echo htmlspecialchars($tname); ?>"><?php echo htmlspecialchars($tname); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6"><label class="form-label">Tuition Fee</label><input type="number" step="0.01" name="tuition" id="m_tuition" class="form-control" required></div>
-                        <div class="col-md-6"><label class="form-label">Boarding Fee</label><input type="number" step="0.01" name="boarding" id="m_boarding" class="form-control" required></div>
-                        <div class="col-md-6"><label class="form-label">Activity Fee</label><input type="number" step="0.01" name="activity" id="m_activity" class="form-control" required></div>
-                        <div class="col-md-6"><label class="form-label">Other Charges</label><input type="number" step="0.01" name="others" id="m_others" class="form-control" required></div>
+                        <div class="ui-field">
+                            <label for="m_tuition">Tuition fee</label>
+                            <input type="number" step="0.01" min="0" name="tuition" id="m_tuition" class="form-control ui-input fee-input" required>
+                        </div>
+                        <div class="ui-field">
+                            <label for="m_boarding">Boarding fee</label>
+                            <input type="number" step="0.01" min="0" name="boarding" id="m_boarding" class="form-control ui-input fee-input" required>
+                        </div>
+                        <div class="ui-field">
+                            <label for="m_activity">Activity fee</label>
+                            <input type="number" step="0.01" min="0" name="activity" id="m_activity" class="form-control ui-input fee-input" required>
+                        </div>
+                        <div class="ui-field">
+                            <label for="m_others">Other charges</label>
+                            <input type="number" step="0.01" min="0" name="others" id="m_others" class="form-control ui-input fee-input" required>
+                        </div>
+                    </div>
+                    <div class="fx-preview">
+                        <span>Total for the term</span>
+                        <strong id="m_total">KES 0.00</strong>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="save_fee" class="btn btn-primary rounded-pill px-4 fw-bold"><i class="bi bi-save me-1"></i>Save Changes</button>
+                    <button type="button" class="ui-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="save_fee" class="ui-btn is-primary">
+                        <i class="bi bi-check-lg"></i> Save fees
+                    </button>
                 </div>
             </form>
         </div>
@@ -318,45 +483,51 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 <?php include("footer.php"); ?>
 
 <script>
-    const searchInput = document.getElementById('searchInput');
-    const filterForm  = document.getElementById('filterForm');
-    const filterTerm  = document.getElementById('filterTerm');
-    const tableRows   = document.querySelectorAll('.fee-row');
+    let currentTab = <?php echo json_encode($active_form, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
-    function performFilter() {
-        const query  = (searchInput?.value || '').toLowerCase();
-        const f_form = filterForm?.value || '';
-        const f_term = filterTerm?.value || '';
-        tableRows.forEach(row => {
-            const text    = row.innerText.toLowerCase();
-            const rowForm = row.querySelector('.row-form')?.innerText.trim() || '';
-            const rowTerm = row.querySelector('.row-term')?.innerText.trim() || '';
-            const matchesSearch = text.includes(query);
-            const matchesForm   = f_form === '' || rowForm === f_form;
-            const matchesTerm   = f_term === '' || rowTerm === f_term;
-            row.style.display = (matchesSearch && matchesForm && matchesTerm) ? '' : 'none';
+    // ---- Tabs: one form at a time (or all) ----
+    function setTab(name) {
+        currentTab = name;
+        document.querySelectorAll('.fx-tab').forEach(t => {
+            t.classList.toggle('is-active', t.dataset.tab === name);
+        });
+        document.querySelectorAll('.fx-section').forEach(s => {
+            s.classList.toggle('is-visible', name === 'all' || s.dataset.form === name);
         });
     }
-    if (searchInput) searchInput.addEventListener('input', performFilter);
-    if (filterForm)  filterForm.addEventListener('change', performFilter);
-    if (filterTerm)  filterTerm.addEventListener('change', performFilter);
-
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.getElementById('modalTitle').innerText = "Edit Fee Structure";
-            document.getElementById('m_form').value     = this.dataset.form;
-            document.getElementById('m_term').value     = this.dataset.term;
-            document.getElementById('m_tuition').value  = this.dataset.tuition;
-            document.getElementById('m_boarding').value = this.dataset.boarding;
-            document.getElementById('m_activity').value = this.dataset.activity;
-            document.getElementById('m_others').value   = this.dataset.others;
-        });
+    document.querySelectorAll('.fx-tab').forEach(t => {
+        t.addEventListener('click', () => setTab(t.dataset.tab));
     });
+    setTab(currentTab);
 
-    function resetModal() {
-        document.getElementById('modalTitle').innerText = "New Fee Structure";
-        document.querySelector('#feeModal form').reset();
+    // ---- Live total in the pop-up ----
+    function updateTotal() {
+        let sum = 0;
+        document.querySelectorAll('.fee-input').forEach(i => { sum += parseFloat(i.value) || 0; });
+        document.getElementById('m_total').textContent =
+            'KES ' + sum.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
+    document.querySelectorAll('.fee-input').forEach(i => i.addEventListener('input', updateTotal));
+
+    // ---- Set / edit pop-up: opens already set to the form and term you clicked ----
+    const feeModalEl = document.getElementById('feeModal');
+    const feeModal   = new bootstrap.Modal(feeModalEl);
+
+    function openFeeModal(form, term, vals) {
+        const editing = !!vals;
+        vals = vals || {};
+        const f = form || (currentTab !== 'all' ? currentTab : '');
+        document.getElementById('m_form').value     = f;
+        document.getElementById('m_term').value     = term || 'Term 1';
+        document.getElementById('m_tuition').value  = editing ? vals.tuition  : '';
+        document.getElementById('m_boarding').value = editing ? vals.boarding : '0';
+        document.getElementById('m_activity').value = editing ? vals.activity : '0';
+        document.getElementById('m_others').value   = editing ? vals.others   : '0';
+        document.getElementById('modalTitle').textContent = editing ? 'Edit fees' : 'Set fees';
+        updateTotal();
+        feeModal.show();
+    }
+    feeModalEl.addEventListener('shown.bs.modal', () => document.getElementById('m_tuition').focus());
 </script>
 </body>
 </html>

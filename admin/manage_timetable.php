@@ -7,7 +7,6 @@ include('../database/db_connect.php');
 $message = '';
 $message_type = '';
 
-// Selected form from URL (passed from forms.php)
 $selected_form = $_GET['form'] ?? '';
 
 // ---- Handle Entry Deletion ----
@@ -55,48 +54,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lesson'])) {
     }
 }
 
-// ---- Fetch subjects for dropdown ----
+// ---- Fetch data ----
 $subjects = [];
 $s_res = $conn->query("SELECT subject_id, subject_name FROM subjects ORDER BY subject_name ASC");
-if ($s_res) {
-    while ($s = $s_res->fetch_assoc()) $subjects[] = $s;
-}
+if ($s_res) { while ($s = $s_res->fetch_assoc()) $subjects[] = $s; }
 
-// ---- Fetch classes for dropdown ----
 $classes = [];
 $c_res = $conn->query("SELECT name FROM classes ORDER BY sort_order ASC");
-if ($c_res) {
-    while ($c = $c_res->fetch_assoc()) $classes[] = $c['name'];
-}
-if (empty($classes)) {
-    $classes = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
-}
+if ($c_res) { while ($c = $c_res->fetch_assoc()) $classes[] = $c['name']; }
+if (empty($classes)) { $classes = ['Form 1', 'Form 2', 'Form 3', 'Form 4']; }
 
-// ---- Fetch timetable entries ----
 $entries = [];
 if ($selected_form !== '') {
-    $stmt = $conn->prepare("
-        SELECT t.*, s.subject_name
-        FROM timetable t
-        LEFT JOIN subjects s ON t.subject_id = s.subject_id
-        WHERE t.form = ?
-        ORDER BY FIELD(t.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), t.start_time
-    ");
+    $stmt = $conn->prepare("SELECT t.*, s.subject_name FROM timetable t LEFT JOIN subjects s ON t.subject_id = s.subject_id WHERE t.form = ? ORDER BY FIELD(t.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), t.start_time");
     $stmt->bind_param("s", $selected_form);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) $entries[] = $row;
     $stmt->close();
 } else {
-    $res = $conn->query("
-        SELECT t.*, s.subject_name
-        FROM timetable t
-        LEFT JOIN subjects s ON t.subject_id = s.subject_id
-        ORDER BY t.form, FIELD(t.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), t.start_time
-    ");
-    if ($res) {
-        while ($row = $res->fetch_assoc()) $entries[] = $row;
-    }
+    $res = $conn->query("SELECT t.*, s.subject_name FROM timetable t LEFT JOIN subjects s ON t.subject_id = s.subject_id ORDER BY t.form, FIELD(t.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'), t.start_time");
+    if ($res) { while ($row = $res->fetch_assoc()) $entries[] = $row; }
 }
 
 $active_page = 'manage_timetable';
@@ -114,115 +92,8 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --sidebar-bg: #34445c;
-            --sidebar-header: #dee2e6;
-            --primary-blue: #1a3066;
-            --sidebar-width: 260px;
-        }
-
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar {
-            width: var(--sidebar-width); height: 100vh;
-            background: var(--sidebar-bg); color: white;
-            position: fixed; left: 0; top: 0;
-            z-index: 1200; transition: all 0.3s ease;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
-        }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar,
-        body.sidebar-toggled .main-content { margin-left: 0; }
-
-        .sidebar-header {
-            background: var(--sidebar-header); padding: 12px 20px;
-            display: flex; align-items: center; gap: 12px; height: 70px;
-        }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; }
-
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link {
-            color: #d1d5db; padding: 15px 20px; font-size: 0.95rem;
-            display: flex; align-items: center; justify-content: space-between;
-            text-decoration: none; transition: 0.2s; cursor: pointer;
-        }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
-
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
-
-        .topbar {
-            margin-left: var(--sidebar-width); background: #fff;
-            height: 70px; display: flex; justify-content: space-between;
-            align-items: center; padding: 0 30px;
-            border-bottom: 1px solid #e2e8f0;
-            transition: all 0.3s ease;
-        }
-        #hamburger { color: #34445c; cursor: pointer; font-size: 1.8rem; }
-
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .adm-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .form-control, .form-select {
-            border-radius: 12px; padding: 12px 15px;
-            border: 1px solid #e2e8f0; background-color: #f8fafc;
-            font-size: 0.9rem; transition: all 0.2s;
-        }
-        .form-control:focus, .form-select:focus {
-            box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12);
-            border-color: var(--primary-blue);
-            background: #fff;
-        }
-
-        .btn-primary {
-            background: var(--primary-blue); border: none;
-            padding: 14px; border-radius: 12px;
-            font-weight: 700; transition: 0.3s;
-        }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-
-        .badge-time {
-            background: #eef2ff;
-            color: var(--primary-blue);
-            font-weight: 600;
-            padding: 5px 12px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-        }
-        .badge-day {
-            background: var(--primary-blue);
-            color: white;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .sidebar-overlay {
-            display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; background: rgba(0,0,0,0.4);
-            z-index: 1150;
-        }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        .badge-day { background: var(--primary-tint); color: var(--primary); padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; }
+        .badge-time { background: var(--accent-tint); color: var(--accent-deep); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
     </style>
 </head>
 <body>
@@ -232,22 +103,20 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Timetable Management</h2>
-            <p class="text-muted small mb-0">
-                Viewing schedule for:
-                <strong><?php echo $selected_form !== '' ? htmlspecialchars($selected_form) : 'All Classes'; ?></strong>
-            </p>
+            <a href="forms.php" class="text-decoration-none text-muted fw-bold mb-2 d-inline-block" style="font-size: 0.85rem;">
+                <i class="bi bi-arrow-left me-1"></i> Back to Forms
+            </a>
+            <h1>Timetable Management</h1>
+            <p>Viewing schedule for: <strong style="color: var(--primary);"><?php echo $selected_form !== '' ? htmlspecialchars($selected_form) : 'All Classes'; ?></strong></p>
         </div>
-        <a href="forms.php" class="btn btn-outline-secondary rounded-pill px-4">
-            <i class="bi bi-arrow-left me-2"></i>Back to Forms
-        </a>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4">
-            <?php echo $message; ?>
+        <div class="ui-alert is-<?php echo $message_type; ?>">
+            <i class="bi bi-info-circle-fill"></i>
+            <div><?php echo $message; ?></div>
         </div>
     <?php endif; ?>
 
@@ -255,46 +124,44 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
         <!-- Add lesson form -->
         <div class="col-lg-4">
-            <div class="card adm-card p-4">
-                <h5 class="fw-bold mb-4">Add New Lesson</h5>
+            <div class="panel h-100">
+                <div class="ui-panel-head mb-4" style="padding: 0;">
+                    <h2>Add New Lesson</h2>
+                </div>
                 <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Class / Form</label>
-                        <select name="form" class="form-select" required>
+                    <div class="ui-field mb-3">
+                        <label>Class / Form</label>
+                        <select name="form" class="ui-input form-select" required>
                             <?php foreach ($classes as $cname): ?>
-                                <option value="<?php echo htmlspecialchars($cname); ?>"
-                                        <?php echo ($cname === $selected_form) ? 'selected' : ''; ?>>
+                                <option value="<?php echo htmlspecialchars($cname); ?>" <?php echo ($cname === $selected_form) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($cname); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Day of Week</label>
-                        <select name="day_of_week" class="form-select" required>
-                            <option>Monday</option>
-                            <option>Tuesday</option>
-                            <option>Wednesday</option>
-                            <option>Thursday</option>
-                            <option>Friday</option>
+                    <div class="ui-field mb-3">
+                        <label>Day of Week</label>
+                        <select name="day_of_week" class="ui-input form-select" required>
+                            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                            <option>Thursday</option><option>Friday</option>
                         </select>
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col">
-                            <label class="form-label">Start Time</label>
-                            <input type="time" name="start_time" class="form-control" required>
+                        <div class="col ui-field">
+                            <label>Start Time</label>
+                            <input type="time" name="start_time" class="ui-input" required>
                         </div>
-                        <div class="col">
-                            <label class="form-label">End Time</label>
-                            <input type="time" name="end_time" class="form-control" required>
+                        <div class="col ui-field">
+                            <label>End Time</label>
+                            <input type="time" name="end_time" class="ui-input" required>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Subject</label>
-                        <select name="subject_id" class="form-select" required>
+                    <div class="ui-field mb-3">
+                        <label>Subject</label>
+                        <select name="subject_id" class="ui-input form-select" required>
                             <option value="">Select Subject...</option>
                             <?php foreach ($subjects as $s): ?>
                                 <option value="<?php echo intval($s['subject_id']); ?>">
@@ -304,13 +171,13 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                         </select>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label">Room / Venue</label>
-                        <input type="text" name="room_no" class="form-control" placeholder="e.g. Room 10 or Lab">
+                    <div class="ui-field mb-4">
+                        <label>Room / Venue</label>
+                        <input type="text" name="room_no" class="ui-input" placeholder="e.g. Room 10 or Lab">
                     </div>
 
-                    <button type="submit" name="add_lesson" class="btn btn-primary w-100">
-                        <i class="bi bi-plus-circle me-1"></i>Add to Schedule
+                    <button type="submit" name="add_lesson" class="ui-btn is-primary w-100">
+                        <i class="bi bi-plus-circle"></i> Add to Schedule
                     </button>
                 </form>
             </div>
@@ -318,61 +185,56 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 
         <!-- Current schedule table -->
         <div class="col-lg-8">
-            <div class="card adm-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0">Current Schedule</h5>
-                    <span class="badge rounded-pill bg-light text-dark border">
-                        <?php echo count($entries); ?> lesson<?php echo count($entries) === 1 ? '' : 's'; ?>
-                    </span>
+            <div class="panel is-flush h-100">
+                <div class="ui-panel-head">
+                    <div class="ui-panel-title">
+                        <h2>Current Schedule</h2>
+                        <span class="ui-count"><?php echo count($entries); ?> Lessons</span>
+                    </div>
                 </div>
 
                 <?php if (empty($entries)): ?>
-                    <div class="text-center py-5">
-                        <i class="bi bi-calendar-x fs-1 text-muted d-block mb-3"></i>
-                        <p class="text-muted mb-0">
-                            No lessons scheduled<?php echo $selected_form !== '' ? ' for this form' : ''; ?> yet.
-                        </p>
+                    <div class="ui-empty">
+                        <i class="bi bi-calendar-x"></i>
+                        <p>No lessons scheduled</p>
+                        <small>Use the form to add a lesson to the timetable.</small>
                     </div>
                 <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr class="small text-muted text-uppercase">
+                    <div class="ui-table-wrap">
+                        <table class="ui-table">
+                            <thead>
+                                <tr>
                                     <th>Day</th>
                                     <th>Time</th>
                                     <th>Subject</th>
                                     <th>Room</th>
-                                    <th class="text-end">Action</th>
+                                    <th class="is-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($entries as $row): ?>
                                     <tr>
-                                        <td>
-                                            <span class="badge-day"><?php echo htmlspecialchars($row['day_of_week']); ?></span>
-                                        </td>
+                                        <td><span class="badge-day"><?php echo htmlspecialchars($row['day_of_week']); ?></span></td>
                                         <td>
                                             <span class="badge-time">
-                                                <?php echo date("h:i A", strtotime($row['start_time'])); ?>
-                                                &ndash;
-                                                <?php echo date("h:i A", strtotime($row['end_time'])); ?>
+                                                <?php echo date("h:i A", strtotime($row['start_time'])); ?> &ndash; <?php echo date("h:i A", strtotime($row['end_time'])); ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <div class="fw-bold text-dark"><?php echo htmlspecialchars($row['subject_name'] ?? '—'); ?></div>
-                                            <div class="text-muted small"><?php echo htmlspecialchars($row['form'] ?? ''); ?></div>
+                                            <span class="ui-name"><?php echo htmlspecialchars($row['subject_name'] ?? '—'); ?></span>
+                                            <span class="ui-sub"><?php echo htmlspecialchars($row['form'] ?? ''); ?></span>
                                         </td>
                                         <td>
-                                            <span class="text-muted small">
+                                            <span class="text-muted fw-semibold" style="font-size: 0.9rem;">
                                                 <?php echo !empty($row['room_no']) ? htmlspecialchars($row['room_no']) : '—'; ?>
                                             </span>
                                         </td>
-                                        <td class="text-end">
-                                            <a href="?delete=<?php echo intval($row['timetable_id']); ?>&form=<?php echo urlencode($selected_form); ?>"
-                                               class="btn btn-sm btn-outline-danger border-0"
-                                               onclick="return confirm('Remove this lesson?');">
-                                                <i class="bi bi-trash3"></i>
-                                            </a>
+                                        <td class="is-right">
+                                            <div class="ui-row-actions">
+                                                <a href="?delete=<?php echo intval($row['timetable_id']); ?>&form=<?php echo urlencode($selected_form); ?>" class="ui-icon is-danger" onclick="return confirm('Remove this lesson?');">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

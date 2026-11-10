@@ -34,18 +34,15 @@ if (isset($_POST['register_staff'])) {
     $phone         = trim($_POST['phone']         ?? '');
     $qualification = trim($_POST['qualification'] ?? '');
     
-    // This holds the JSON array of pairs
     $assignments_json = $_POST['assignments_json'] ?? '[]';
     $assignments = json_decode($assignments_json, true);
 
     $password = password_hash($default_pass, PASSWORD_DEFAULT);
     $role     = "teacher";
 
-    // Regenerate SERVER-SIDE
     $employee_id = getNextStaffId($conn);
     $email       = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $employee_id)) . '@' . $school_domain;
 
-    // Basic validation
     if ($full_name === '' || $phone === '' || $qualification === '') {
         $message = "Please fill all required fields.";
         $message_type = 'warning';
@@ -69,9 +66,8 @@ if (isset($_POST['register_staff'])) {
             $teacher_id = $conn->insert_id;
             $stmt_staff->close();
 
-            // 3. Insert exact pairs into teacher_assignments
+            // 3. Insert exact pairs
             $stmt_assign = $conn->prepare("INSERT INTO teacher_assignments (teacher_id, class_name, subject_id) VALUES (?, ?, ?)");
-            
             foreach ($assignments as $pair) {
                 $cls = $pair['class'] ?? '';
                 $sub_id = (int)($pair['subject'] ?? 0);
@@ -95,7 +91,6 @@ if (isset($_POST['register_staff'])) {
             ";
             $message_type = 'success';
 
-            // Refresh preview
             $next_employee_id = getNextStaffId($conn);
             $next_email       = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $next_employee_id)) . '@' . $school_domain;
 
@@ -107,7 +102,7 @@ if (isset($_POST['register_staff'])) {
     }
 }
 
-// Fetch available classes and subjects
+// Fetch classes and subjects
 $all_classes = [];
 $c_res = $conn->query("SELECT name FROM classes ORDER BY sort_order ASC");
 if ($c_res) { while ($c = $c_res->fetch_assoc()) $all_classes[] = $c['name']; }
@@ -132,62 +127,18 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        :root { --sidebar-bg: #34445c; --sidebar-header: #dee2e6; --primary-blue: #1a3066; --sidebar-width: 260px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin: 0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; z-index: 1200; transition: all 0.3s ease; overflow-y: auto; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: var(--sidebar-header); padding: 12px 20px; display: flex; align-items: center; gap: 12px; height: 70px; }
-        .sidebar-header img { height: 45px; width: 45px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 1rem; }
-        .nav-item { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-link { color: #d1d5db; padding: 15px 20px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; text-decoration: none; transition: 0.2s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #41516a; color: white; }
-        .submenu { background: #2c3a4d; list-style: none; padding: 0; margin: 0; display: none; }
-        .submenu li a { color: #cbd5e0; padding: 12px 20px 12px 50px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { color: #f6e05e; background: rgba(255,255,255,0.05); }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .form-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .form-control, .form-select { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; background-color: #f8fafc; font-size: 0.9rem; transition: all 0.2s; }
-        .form-control:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12); border-color: var(--primary-blue); background: #fff; }
-
+        /* Assignment Builder Custom UI */
+        .assign-builder { background: var(--bg-light); border: 1.5px solid var(--line); border-radius: 16px; padding: 20px; }
+        .assign-list { list-style: none; padding: 0; margin: 0; }
+        .assign-item { display: flex; justify-content: space-between; align-items: center; background: var(--white); border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
+        .assign-item .badge { font-size: 0.85rem; padding: 6px 12px; }
+        .remove-assign { color: #b42318; cursor: pointer; background: none; border: none; font-size: 1.2rem; transition: 0.2s; }
+        .remove-assign:hover { color: #911b12; transform: scale(1.1); }
+        
         /* Multi-select styling */
         select[multiple] { min-height: 120px; background-image: none; }
         select[multiple] option { padding: 8px 12px; border-radius: 6px; margin-bottom: 2px; }
-        select[multiple] option:checked { background-color: var(--primary-blue) !important; color: white !important; }
-
-        .btn-primary { background: var(--primary-blue); border: none; padding: 14px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-        .btn-add-assign { background: #f6b612; color: #1e293b; border: none; font-weight: 700; border-radius: 12px; }
-        .btn-add-assign:hover { background: #e0a50b; }
-
-        .section-heading { border-left: 4px solid #f6b612; padding-left: 15px; }
-        .section-heading h5 { font-weight: 800; color: #1e293b; margin: 0; }
-
-        .preview-box { background: linear-gradient(135deg, #1a3066 0%, #34445c 100%); color: white; border-radius: 16px; padding: 20px 24px; }
-        .preview-box .label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.75; }
-        .preview-box .value { font-weight: 700; font-size: 1rem; font-family: monospace; }
-
-        /* Assignment Builder UI */
-        .assign-builder { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
-        .assign-list { list-style: none; padding: 0; margin: 0; }
-        .assign-item { display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
-        .assign-item .badge { font-size: 0.85rem; padding: 6px 12px; }
-        .remove-assign { color: #ef4444; cursor: pointer; background: none; border: none; font-size: 1.2rem; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        select[multiple] option:checked { background-color: var(--primary) !important; color: white !important; }
     </style>
 </head>
 <body>
@@ -199,85 +150,87 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     <div class="row justify-content-center">
         <div class="col-xl-9">
 
-            <div class="mb-5">
-                <a href="staff.php" class="btn btn-link text-decoration-none text-muted p-0 small fw-bold text-uppercase mb-2 d-inline-block">
-                    <i class="bi bi-arrow-left me-2"></i> Back to Directory
-                </a>
-                <h2 class="fw-bold text-dark mb-1">Staff Onboarding</h2>
-                <p class="text-muted mb-0">Create the staff profile and map out their exact teaching classes.</p>
+            <div class="ui-head">
+                <div>
+                    <a href="staff.php" class="text-decoration-none text-muted fw-bold mb-2 d-inline-block" style="font-size: 0.85rem;">
+                        <i class="bi bi-arrow-left me-1"></i> Back to Directory
+                    </a>
+                    <h1>Staff Onboarding</h1>
+                    <p>Create the staff profile and map out their exact teaching classes.</p>
+                </div>
             </div>
 
-            <div class="preview-box mb-4">
+            <!-- Preview Card -->
+            <div class="panel mb-4" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-soft) 100%); color: white;">
                 <div class="d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-magic fs-5"></i>
-                    <span class="fw-bold">Next new staff member will receive:</span>
+                    <i class="bi bi-magic fs-5" style="color: var(--accent);"></i>
+                    <span class="fw-bold fs-5">Next new staff member will receive:</span>
                 </div>
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <div class="label">Employee ID</div>
-                        <div class="value"><?php echo htmlspecialchars($next_employee_id); ?></div>
+                        <div style="font-size: 0.7rem; font-weight: 800; text-transform: uppercase; opacity: 0.75; letter-spacing: 0.1em;">Employee ID</div>
+                        <div class="fw-bold fs-5 font-monospace mt-1"><?php echo htmlspecialchars($next_employee_id); ?></div>
                     </div>
                     <div class="col-md-6">
-                        <div class="label">Login Email</div>
-                        <div class="value"><?php echo htmlspecialchars($next_email); ?></div>
+                        <div style="font-size: 0.7rem; font-weight: 800; text-transform: uppercase; opacity: 0.75; letter-spacing: 0.1em;">Login Email</div>
+                        <div class="fw-bold fs-5 font-monospace mt-1"><?php echo htmlspecialchars($next_email); ?></div>
                     </div>
                 </div>
             </div>
 
             <?php if ($message): ?>
-                <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 p-4 mb-4">
-                    <?php echo $message; ?>
+                <div class="ui-alert is-<?php echo $message_type; ?>">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div><?php echo $message; ?></div>
                 </div>
             <?php endif; ?>
 
-            <form method="post" class="card p-4 p-md-5" id="staffForm">
+            <form method="post" class="panel p-4 p-md-5" id="staffForm">
                 <div class="row g-4">
 
                     <div class="col-12 mb-2">
-                        <div class="section-heading">
-                            <h5>Personal Information</h5>
+                        <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                            <h5 class="fw-bold mb-0" style="color: var(--primary);">Personal Information</h5>
                         </div>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" name="full_name" class="form-control" placeholder="Enter Official Name" required>
+                    <div class="col-md-6 ui-field">
+                        <label>Full Name</label>
+                        <input type="text" name="full_name" class="ui-input" placeholder="Enter Official Name" required>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Phone Number</label>
-                        <input type="text" name="phone" class="form-control" placeholder="e.g. 07..." required>
+                    <div class="col-md-6 ui-field">
+                        <label>Phone Number</label>
+                        <input type="text" name="phone" class="ui-input" placeholder="e.g. 07..." required>
                     </div>
 
-                    <div class="col-12">
-                        <label class="form-label">Qualification / Primary Department</label>
-                        <input type="text" name="qualification" class="form-control" placeholder="e.g. B.Ed Arts" required>
+                    <div class="col-12 ui-field">
+                        <label>Qualification / Primary Department</label>
+                        <input type="text" name="qualification" class="ui-input" placeholder="e.g. B.Ed Arts" required>
                     </div>
 
                     <div class="col-12 mt-5 mb-2">
-                        <div class="section-heading">
-                            <h5>Class & Subject Assignments</h5>
+                        <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                            <h5 class="fw-bold mb-0" style="color: var(--primary);">Class & Subject Assignments</h5>
                         </div>
-                        <p class="text-muted small mt-2 mb-3">
-                            Select a class, then select one or more subjects using <strong>Ctrl</strong> (or Cmd on Mac) and click Add.
-                        </p>
+                        <p class="text-muted small mt-2 mb-3">Select a class, then select one or more subjects using <strong>Ctrl</strong> (or Cmd on Mac) and click Add.</p>
                     </div>
 
                     <div class="col-12">
                         <div class="assign-builder">
-                            <div class="row g-2 align-items-end mb-4">
-                                <div class="col-md-4">
-                                    <label class="form-label">Select Class</label>
-                                    <select id="selectClass" class="form-select">
+                            <div class="row g-3 align-items-end mb-4">
+                                <div class="col-md-4 ui-field">
+                                    <label>Select Class</label>
+                                    <select id="selectClass" class="ui-input form-select">
                                         <option value="" disabled selected>-- Choose Class --</option>
                                         <?php foreach ($all_classes as $cname): ?>
                                             <option value="<?php echo htmlspecialchars($cname); ?>"><?php echo htmlspecialchars($cname); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Select Subject(s) <span class="text-muted fw-normal" style="text-transform:none;">(Ctrl+Click)</span></label>
-                                    <select id="selectSubject" class="form-select" multiple>
+                                <div class="col-md-6 ui-field">
+                                    <label>Select Subject(s)</label>
+                                    <select id="selectSubject" class="ui-input form-select" multiple>
                                         <?php foreach ($all_subjects as $sub): ?>
                                             <option value="<?php echo intval($sub['subject_id']); ?>" data-name="<?php echo htmlspecialchars($sub['subject_name']); ?>">
                                                 <?php echo htmlspecialchars($sub['subject_name']); ?>
@@ -286,13 +239,12 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                                     </select>
                                 </div>
                                 <div class="col-md-2">
-                                    <button type="button" class="btn btn-add-assign w-100 py-3" onclick="addAssignment()">
+                                    <button type="button" class="ui-btn is-primary w-100 py-3" onclick="addAssignment()">
                                         <i class="bi bi-plus-lg"></i> Add
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Hidden input to hold JSON for PHP -->
                             <input type="hidden" name="assignments_json" id="assignmentsJson" value="[]">
 
                             <h6 class="fw-bold text-muted text-uppercase small mb-3">Assigned Pairs:</h6>
@@ -303,29 +255,29 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                     </div>
 
                     <div class="col-12 mt-5 mb-2">
-                        <div class="section-heading">
-                            <h5>System Access (auto-generated)</h5>
+                        <div class="d-flex align-items-center gap-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+                            <h5 class="fw-bold mb-0" style="color: var(--primary);">System Access (auto-generated)</h5>
                         </div>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Employee ID</label>
-                        <input type="text" class="form-control fw-bold" value="<?php echo htmlspecialchars($next_employee_id); ?>" readonly>
+                    <div class="col-md-6 ui-field">
+                        <label>Employee ID</label>
+                        <input type="text" class="ui-input fw-bold" value="<?php echo htmlspecialchars($next_employee_id); ?>" readonly style="background: var(--bg-light);">
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Login Email</label>
-                        <input type="email" class="form-control fw-bold" value="<?php echo htmlspecialchars($next_email); ?>" readonly>
+                    <div class="col-md-6 ui-field">
+                        <label>Login Email</label>
+                        <input type="email" class="ui-input fw-bold" value="<?php echo htmlspecialchars($next_email); ?>" readonly style="background: var(--bg-light);">
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label">Temporary Password</label>
-                        <input type="text" class="form-control fw-bold" value="<?php echo htmlspecialchars($default_pass); ?>" readonly>
+                    <div class="col-md-6 ui-field">
+                        <label>Temporary Password</label>
+                        <input type="text" class="ui-input fw-bold" value="<?php echo htmlspecialchars($default_pass); ?>" readonly style="background: var(--bg-light);">
                     </div>
 
-                    <div class="col-12 mt-5">
-                        <button type="submit" name="register_staff" class="btn btn-primary w-100 shadow" id="submitBtn">
-                            <i class="bi bi-person-plus-fill me-2"></i> Register &amp; Generate Account
+                    <div class="col-12 mt-5 text-end">
+                        <button type="submit" name="register_staff" class="ui-btn is-primary px-5 py-3" id="submitBtn">
+                            <i class="bi bi-person-plus-fill"></i> Register &amp; Generate Account
                         </button>
                     </div>
 
@@ -338,26 +290,16 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
 <?php include("footer.php"); ?>
 
 <script>
-    // Array to hold our pairs
     let assignments = [];
 
     function addAssignment() {
         const classSelect = document.getElementById('selectClass');
         const subjectSelect = document.getElementById('selectSubject');
-        
         const selectedClass = classSelect.value;
-        
-        // Get all selected options from the multi-select
         const selectedOptions = Array.from(subjectSelect.selectedOptions);
 
-        if (!selectedClass) {
-            alert('Please select a class first.');
-            return;
-        }
-        if (selectedOptions.length === 0) {
-            alert('Please select at least one subject.');
-            return;
-        }
+        if (!selectedClass) { alert('Please select a class first.'); return; }
+        if (selectedOptions.length === 0) { alert('Please select at least one subject.'); return; }
 
         let addedCount = 0;
         let duplicateCount = 0;
@@ -365,34 +307,21 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
         selectedOptions.forEach(opt => {
             const subId = opt.value;
             const subName = opt.getAttribute('data-name');
-
-            // Check if already exists
             const exists = assignments.find(a => a.class === selectedClass && a.subject === subId);
+            
             if (exists) {
                 duplicateCount++;
             } else {
-                assignments.push({
-                    class: selectedClass,
-                    subject: subId,
-                    subjectName: subName
-                });
+                assignments.push({ class: selectedClass, subject: subId, subjectName: subName });
                 addedCount++;
             }
         });
 
-        // Reset select boxes
         classSelect.value = '';
         subjectSelect.value = '';
-
         updateUI();
 
-        // Give feedback if some were skipped
-        if (addedCount > 0) {
-            // optional: show a small toast or just silently update
-        }
-        if (duplicateCount > 0) {
-            alert(`Skipped ${duplicateCount} subject(s) that were already assigned to ${selectedClass}.`);
-        }
+        if (duplicateCount > 0) alert(`Skipped ${duplicateCount} subject(s) that were already assigned to ${selectedClass}.`);
     }
 
     function removeAssignment(index) {
@@ -403,7 +332,6 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
     function updateUI() {
         const list = document.getElementById('assignmentList');
         const hiddenInput = document.getElementById('assignmentsJson');
-
         list.innerHTML = '';
 
         if (assignments.length === 0) {
@@ -412,7 +340,6 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
             return;
         }
 
-        // Group by class for a cleaner display
         const grouped = {};
         assignments.forEach((item, index) => {
             if (!grouped[item.class]) grouped[item.class] = [];
@@ -422,14 +349,14 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
         for (const className in grouped) {
             const classHeader = document.createElement('div');
             classHeader.className = 'mb-2 mt-3';
-            classHeader.innerHTML = `<strong class="text-dark"><i class="bi bi-bookmark-fill text-warning me-1"></i>${className}</strong>`;
+            classHeader.innerHTML = `<strong class="text-dark" style="font-size: 0.9rem;"><i class="bi bi-bookmark-fill" style="color: var(--accent); margin-right: 6px;"></i>${className}</strong>`;
             list.appendChild(classHeader);
 
             grouped[className].forEach(item => {
                 const li = document.createElement('li');
                 li.className = 'assign-item ms-3';
                 li.innerHTML = `
-                    <div class="fw-bold text-primary">${item.subjectName}</div>
+                    <div class="fw-bold" style="color: var(--primary);">${item.subjectName}</div>
                     <button type="button" class="remove-assign" onclick="removeAssignment(${item.originalIndex})" title="Remove">
                         <i class="bi bi-x-circle-fill"></i>
                     </button>
@@ -437,11 +364,9 @@ $admin_display_name = $_SESSION['adminUser'] ?? 'Administrator';
                 list.appendChild(li);
             });
         }
-
         hiddenInput.value = JSON.stringify(assignments);
     }
 
-    // Validation on submit
     document.getElementById('staffForm').addEventListener('submit', function(e) {
         if (assignments.length === 0) {
             e.preventDefault();
