@@ -53,43 +53,52 @@ $extra_label = 'Staff Resources';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
+        }
 
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
 
-        /* Modern Cards */
-        .file-card { border: none; border-radius: 20px; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+
+        .file-card { border: none; border-radius: 20px; background: var(--white); box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; height: 100%; display: flex; flex-direction: column; border: 1px solid var(--line); }
         .file-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.08); }
         
-        .icon-box { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: #f8fafc; }
+        .icon-box { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: var(--bg-light); }
         .category-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border-radius: 50px; font-weight: 800; }
 
-        .search-box { max-width: 350px; width: 100%; }
-        .search-box input { border-radius: 50px 0 0 50px; padding-left: 20px; border: 1px solid #cbd5e1; }
-        .search-box .input-group-text { border-radius: 0 50px 50px 0; border-left: none; border-color: #cbd5e1; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        .ui-search { position: relative; width: 260px; max-width: 100%; }
+        .ui-search i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .ui-search input { width: 100%; box-sizing: border-box; padding: 11px 16px 11px 42px; border: 1.5px solid var(--line); border-radius: 99px; background: var(--bg-light); font-family: inherit; font-size: 0.9rem; color: var(--ink); }
+        .ui-search input:focus { outline: none; border-color: var(--primary); background: var(--white); }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
             .main-content { padding: 20px; }
         }
     </style>
@@ -101,31 +110,33 @@ $extra_label = 'Staff Resources';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-start mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1 text-dark">Staff Resources</h2>
-            <p class="text-muted small mb-0">Download official school documents, forms, and academic materials</p>
+            <h1>Staff Resources</h1>
+            <p>Download official school documents, forms, and academic materials</p>
         </div>
-        <div class="input-group search-box shadow-sm">
-            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-            <input type="text" id="fileSearch" class="form-control border-start-0" placeholder="Search resources...">
+        <div class="d-flex gap-3 align-items-center">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" id="fileSearch" placeholder="Search resources...">
+            </label>
         </div>
     </div>
 
     <?php if (empty($files)): ?>
-        <div class="card p-5 text-center mt-4 border-0 shadow-sm" style="border-radius: 20px;">
-            <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
-                <i class="bi bi-folder2-open fs-1 text-muted"></i>
+        <div class="panel">
+            <div class="ui-empty">
+                <i class="bi bi-folder2-open"></i>
+                <p>No resources uploaded</p>
+                <small>The administration has not posted any downloadable files yet.</small>
             </div>
-            <h5 class="fw-bold text-dark">No resources uploaded</h5>
-            <p class="text-muted mb-0">The administration has not posted any downloadable files yet.</p>
         </div>
     <?php else: ?>
         
         <?php foreach ($grouped as $category => $category_files): ?>
             <div class="mb-5">
                 <div class="d-flex align-items-center mb-3">
-                    <h6 class="fw-bold mb-0 text-dark fs-5"><?php echo htmlspecialchars($category); ?></h6>
+                    <h6 class="fw-bold mb-0" style="color: var(--ink); font-size: 1.1rem;"><?php echo htmlspecialchars($category); ?></h6>
                     <span class="badge bg-light text-secondary border ms-3 px-3 py-1"><?php echo count($category_files); ?> files</span>
                 </div>
                 
@@ -149,9 +160,9 @@ $extra_label = 'Staff Resources';
                                     &middot; <i class="bi bi-calendar3 me-1"></i><?php echo !empty($file['created_at']) ? htmlspecialchars(date('M d, Y', strtotime($file['created_at']))) : '—'; ?>
                                 </p>
                                 <a href="<?php echo htmlspecialchars($file['file_path'] ?? '#'); ?>"
-                                   class="btn btn-primary w-100 fw-bold rounded-pill mt-auto"
+                                   class="ui-btn is-primary w-100 mt-auto"
                                    download>
-                                    <i class="bi bi-download me-2"></i>Download File
+                                    <i class="bi bi-download"></i> Download File
                                 </a>
                             </div>
                         </div>
@@ -165,6 +176,7 @@ $extra_label = 'Staff Resources';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Sidebar Toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');

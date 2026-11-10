@@ -126,63 +126,56 @@ $extra_label = 'Communication Center';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        /* Sidebar */
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        /* Main Content */
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
 
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
 
-        /* Cards */
-        .modern-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 30px; }
-        .form-label { font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
-        .form-control, .form-select { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; background-color: #f8fafc; transition: all 0.2s; }
-        .form-control:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(26, 48, 102, 0.12); border-color: var(--primary-blue); background: #fff; }
-        .btn-primary { background: var(--primary-blue); border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
+        .ui-field label { display: block; margin-bottom: 8px; font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: all 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
 
-        /* Announcements */
-        .notice-item { border-bottom: 1px solid #e2e8f0; padding: 15px 0; }
+        .notice-item { border-bottom: 1px solid var(--line); padding: 15px 0; }
         .notice-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .notice-badge { font-size: 0.65rem; padding: 4px 8px; border-radius: 50px; font-weight: 700; text-transform: uppercase; }
+        .notice-badge { font-size: 0.65rem; padding: 4px 8px; border-radius: 50px; font-weight: 800; text-transform: uppercase; }
         .badge-event { background: #dbeafe; color: #1e40af; }
         .badge-academic { background: #dcfce7; color: #166534; }
         .badge-emergency { background: #fee2e2; color: #991b1b; }
         .badge-general { background: #f1f5f9; color: #475569; }
 
-        /* Messages */
         .msg-bubble { padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        .msg-sent { background: #f1f5f9; border-left: 4px solid var(--primary-blue); }
+        .msg-sent { background: var(--bg-light); border-left: 4px solid var(--primary); }
         .msg-reply { background: #ecfdf5; border-left: 4px solid #10b981; margin-left: 20px; }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
             .main-content { padding: 20px; }
         }
     </style>
@@ -193,37 +186,33 @@ $extra_label = 'Communication Center';
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <div class="d-flex justify-content-between align-items-start mb-4">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Communication Center</h2>
-            <p class="text-muted small mb-0">Read announcements and send messages to Admin or Students.</p>
+            <h1>Communication Center</h1>
+            <p>Read announcements and send messages to Admin or Students.</p>
         </div>
     </div>
 
     <?php if ($success_msg): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?php echo htmlspecialchars($success_msg); ?>
-        </div>
+        <div class="ui-alert is-success"><i class="bi bi-check-circle-fill"></i><div><?php echo htmlspecialchars($success_msg); ?></div></div>
     <?php endif; ?>
     <?php if ($error_msg): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-exclamation-circle-fill me-2"></i> <?php echo htmlspecialchars($error_msg); ?>
-        </div>
+        <div class="ui-alert is-danger"><i class="bi bi-exclamation-circle-fill"></i><div><?php echo htmlspecialchars($error_msg); ?></div></div>
     <?php endif; ?>
 
     <div class="row g-4">
         <!-- Left Side: Announcements -->
         <div class="col-lg-5">
-            <div class="modern-card h-100">
+            <div class="panel h-100">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-megaphone-fill me-2" style="color: #f59e0b;"></i>Staff Announcements</h5>
                 </div>
 
                 <?php if (empty($announcements)): ?>
-                    <div class="text-center py-5">
-                        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                        <h6 class="fw-bold text-muted">No announcements</h6>
-                        <p class="text-muted small mb-0">Admin notices will appear here.</p>
+                    <div class="ui-empty" style="padding: 20px;">
+                        <i class="bi bi-inbox"></i>
+                        <p>No announcements</p>
+                        <small>Admin notices will appear here.</small>
                     </div>
                 <?php else: ?>
                     <div class="announcement-list">
@@ -256,15 +245,14 @@ $extra_label = 'Communication Center';
 
         <!-- Right Side: Messaging -->
         <div class="col-lg-7">
-            <div class="modern-card h-100">
-                <h5 class="fw-bold mb-4"><i class="bi bi-chat-dots-fill me-2" style="color: var(--primary-blue);"></i>Send a Message</h5>
+            <div class="panel h-100">
+                <h5 class="fw-bold mb-4"><i class="bi bi-chat-dots-fill me-2" style="color: var(--primary);"></i>Send a Message</h5>
 
                 <!-- Send Form -->
-                <form method="POST" class="mb-5 p-4 rounded-4" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <form method="POST" class="mb-5 p-4 rounded-4" style="background: var(--bg-light); border: 1px solid var(--line);">
                     
-                    <!-- Recipient Type Toggle -->
-                    <div class="mb-3">
-                        <label class="form-label">Send To</label>
+                    <div class="ui-field mb-3">
+                        <label>Send To</label>
                         <div class="d-flex gap-4">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="recipient_type" id="send_admin" value="admin" checked onchange="toggleRecipientOptions()">
@@ -277,17 +265,15 @@ $extra_label = 'Communication Center';
                         </div>
                     </div>
 
-                    <!-- Student Audience Options (Hidden by default) -->
                     <div class="mb-3 d-none" id="studentOptionsDiv">
-                        <label class="form-label">Message Audience</label>
-                        <select name="audience_type" id="audience_type" class="form-select mb-2" onchange="toggleSingleStudent()">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Audience</label>
+                        <select name="audience_type" id="audience_type" class="ui-input form-select mb-2" onchange="toggleSingleStudent()">
                             <option value="all">All Students in <?php echo htmlspecialchars($assigned_form ?: 'my class'); ?></option>
                             <option value="single">A Specific Student</option>
                         </select>
 
-                        <!-- Specific Student Dropdown (Hidden by default) -->
                         <div class="d-none" id="singleStudentDiv">
-                            <select name="student_id" id="student_id" class="form-select">
+                            <select name="student_id" id="student_id" class="ui-input form-select">
                                 <option value="" disabled selected>-- Choose Student --</option>
                                 <?php foreach ($students as $st): ?>
                                     <option value="<?php echo $st['student_id']; ?>">
@@ -298,22 +284,21 @@ $extra_label = 'Communication Center';
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Subject</label>
-                        <input type="text" name="subject" class="form-control" placeholder="e.g., Homework update or Exam reminder" required>
+                    <div class="ui-field mb-3">
+                        <label>Subject</label>
+                        <input type="text" name="subject" class="ui-input" placeholder="e.g., Homework update or Exam reminder" required>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Message</label>
-                        <textarea name="content" class="form-control" rows="3" placeholder="Type your message here..." required></textarea>
+                    <div class="ui-field mb-3">
+                        <label>Message</label>
+                        <textarea name="content" class="ui-input" rows="3" placeholder="Type your message here..." required></textarea>
                     </div>
                     
-                    <button type="submit" name="send_message" class="btn btn-primary w-100">
-                        <i class="bi bi-send-fill me-2"></i> Send Message
+                    <button type="submit" name="send_message" class="ui-btn is-primary w-100">
+                        <i class="bi bi-send-fill"></i> Send Message
                     </button>
                 </form>
 
-                <!-- Message History -->
                 <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.8rem; letter-spacing: 1px;">Recent Sent Messages</h6>
                 
                 <?php if (empty($messages)): ?>
@@ -323,7 +308,6 @@ $extra_label = 'Communication Center';
                 <?php else: ?>
                     <div class="message-history" style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
                         <?php foreach ($messages as $msg): ?>
-                            <!-- Teacher's Original Message -->
                             <div class="msg-bubble msg-sent">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <strong class="text-dark" style="font-size: 0.9rem;"><?php echo htmlspecialchars($msg['subject']); ?></strong>
@@ -332,7 +316,6 @@ $extra_label = 'Communication Center';
                                 <p class="mb-0 small text-muted"><?php echo nl2br(htmlspecialchars($msg['content'])); ?></p>
                             </div>
 
-                            <!-- Admin's Reply (if exists) -->
                             <?php if (!empty($msg['admin_reply'])): ?>
                                 <div class="msg-bubble msg-reply mb-4">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -355,7 +338,7 @@ $extra_label = 'Communication Center';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Sidebar Toggle Logic
+    // Sidebar Toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -377,7 +360,6 @@ $extra_label = 'Communication Center';
         });
     }
 
-    // Submenu Toggle Logic
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -389,7 +371,7 @@ $extra_label = 'Communication Center';
         });
     });
 
-    // --- RECIPIENT TOGGLE LOGIC ---
+    // Recipient toggle
     function toggleRecipientOptions() {
         const isStudent = document.getElementById('send_student').checked;
         const studentOptionsDiv = document.getElementById('studentOptionsDiv');

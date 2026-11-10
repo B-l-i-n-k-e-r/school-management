@@ -15,17 +15,43 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
 $sys = $conn->query("SELECT school_name FROM system_settings LIMIT 1")->fetch_assoc();
 $school_display = $sys['school_name'] ?? 'The Michaelson School';
 
-// Fetch current teacher
+// Fetch current teacher info
 $staff_id = (int) $_SESSION['user_id'];
 $staff_query = $conn->query("SELECT * FROM teachers WHERE teacher_id = $staff_id");
 $user_data = $staff_query->fetch_assoc() ?: [];
 
 $staff_display_name = $user_data['full_name'] ?? 'Staff';
-$assigned_form      = $user_data['assigned_form']    ?? '';
-$assigned_subject   = $user_data['assigned_subject'] ?? '';
-$employee_id        = $user_data['employee_id']      ?? '';
+$employee_id        = $user_data['employee_id'] ?? '—';
+
+// FETCH ALL ASSIGNMENTS from the teacher_assignments table
+$assigned_classes = [];
+$assigned_subjects = [];
+
+$assign_query = $conn->query("
+    SELECT ta.class_name, s.subject_name 
+    FROM teacher_assignments ta 
+    JOIN subjects s ON ta.subject_id = s.subject_id 
+    WHERE ta.teacher_id = $staff_id
+");
+
+if ($assign_query) {
+    while ($row = $assign_query->fetch_assoc()) {
+        if (!empty($row['class_name'])) {
+            $assigned_classes[$row['class_name']] = $row['class_name'];
+        }
+        if (!empty($row['subject_name'])) {
+            $assigned_subjects[$row['subject_name']] = $row['subject_name'];
+        }
+    }
+}
+// Convert to simple indexed arrays
+$assigned_classes = array_values($assigned_classes);
+$assigned_subjects = array_values($assigned_subjects);
+
+$first_name = explode(' ', trim($staff_display_name))[0];
 
 $active_page = 'dashboard';
+$extra_label = 'Staff Dashboard';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -33,65 +59,160 @@ $active_page = 'dashboard';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | <?php echo htmlspecialchars($school_display); ?></title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* --- Dashboard Specific UI matching the Admin Sample --- */
+        .dash-hero {
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 28px;
+            padding: 40px 44px;
+            border-radius: 28px;
+            color: var(--white);
+            background: linear-gradient(115deg, var(--primary) 0%, var(--primary-soft) 100%);
+            box-shadow: 0 30px 60px -28px rgba(0, 10, 102, 0.55);
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        /* Sidebar */
-        .sidebar { 
-            width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); 
-            color: white; position: fixed; left: 0; top: 0; overflow-y: auto; 
-            z-index: 1200; transition: all 0.3s ease;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
+        .dash-hero::after {
+            content: "";
+            position: absolute;
+            right: -90px;
+            bottom: -140px;
+            width: 380px;
+            height: 380px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(250, 204, 21, 0.32), transparent 70%);
         }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
-
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { 
-            color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; 
-            display: flex; justify-content: space-between; align-items: center; 
-            text-decoration: none; transition: 0.3s; cursor: pointer;
+        .dash-hero > * { position: relative; z-index: 1; }
+        
+        .dash-date {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 16px;
+            padding: 7px 14px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.82rem;
+            font-weight: 600;
         }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
-
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .welcome-banner {
-            background: linear-gradient(135deg, #1a3066 0%, #2c3a4d 100%);
-            border-radius: 20px; color: white; padding: 40px; margin-bottom: 40px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        .dash-date i { color: var(--accent); }
+        
+        .dash-hero h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.6rem, 3vw, 2.2rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
         }
-        .stat-card { background: white; border-radius: 20px; padding: 25px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 100%; }
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .dash-hero p.sub {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 1rem;
+        }
 
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        /* Stat cards */
+        .dash-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+        .dash-stat {
+            background: var(--white);
+            border-radius: 24px;
+            padding: 26px;
+            box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+        .dash-stat:hover { transform: translateY(-4px); }
+        .dash-stat-icon {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            background: var(--primary-tint);
+            color: var(--primary);
+            font-size: 1.25rem;
+            margin-bottom: 22px;
+        }
+        .dash-stat span {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* Badges for classes and subjects */
+        .dash-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .dash-pill {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            background: var(--bg-light);
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+        .dash-pill.is-gold {
+            background: var(--accent-tint);
+            color: var(--accent-deep);
+            border-color: var(--accent);
+        }
+
+        /* Quick Actions */
+        .dash-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .dash-action {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 24px 16px;
+            border-radius: 20px;
+            background: var(--bg-light);
+            color: var(--ink);
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.2s;
+            text-align: center;
+        }
+        .dash-action i.lead {
+            width: 50px;
+            height: 50px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            background: var(--white);
+            color: var(--primary);
+            font-size: 1.3rem;
+            transition: background 0.2s;
+        }
+        .dash-action:hover { background: var(--primary-tint); transform: translateY(-3px); color: var(--primary); }
+        .dash-action:hover i.lead { background: var(--accent); color: var(--primary); }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
+            .dash-stats { grid-template-columns: 1fr 1fr; }
+            .dash-actions { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 520px) {
+            .dash-stats { grid-template-columns: 1fr; }
+            .dash-hero { padding: 30px 24px; }
         }
     </style>
 </head>
@@ -101,57 +222,82 @@ $active_page = 'dashboard';
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <div class="welcome-banner">
-        <h2 class="fw-bold mb-1">Hello, <?php echo htmlspecialchars(explode(' ', trim($staff_display_name))[0]); ?>!</h2>
-        <p class="mb-0 opacity-75 fw-500">Welcome to your <?php echo htmlspecialchars($school_display); ?> staff workstation.</p>
-    </div>
 
-    <div class="row g-4 mb-5">
-        <div class="col-md-4">
-            <div class="stat-card">
-                <p class="text-muted small mb-1 fw-bold text-uppercase">Primary Subject</p>
-                <h3 class="fw-bold mb-0 text-primary"><?php echo htmlspecialchars($assigned_subject ?: 'Not Assigned'); ?></h3>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <p class="text-muted small mb-1 fw-bold text-uppercase">Assigned Class</p>
-                <h3 class="fw-bold mb-0 text-success"><?php echo htmlspecialchars($assigned_form ?: 'General'); ?></h3>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <p class="text-muted small mb-1 fw-bold text-uppercase">Staff ID</p>
-                <h3 class="fw-bold mb-0 text-dark"><?php echo htmlspecialchars($employee_id ?: '—'); ?></h3>
-            </div>
-        </div>
-    </div>
+    <!-- Hero Banner -->
+    <section class="dash-hero">
+        <p class="dash-date"><i class="bi bi-calendar3"></i> <?php echo date('l, j F Y'); ?></p>
+        <h1>Hello, <?php echo htmlspecialchars($first_name); ?>!</h1>
+        <p class="sub">Welcome back to your <?php echo htmlspecialchars($school_display); ?> staff workstation.</p>
+    </section>
 
-    <div class="card p-4">
-        <h5 class="fw-bold mb-4">Quick Shortcuts</h5>
-        <div class="row g-3">
-            <div class="col-md-3">
-                <a href="attendance.php" class="btn btn-light w-100 py-3 border-0 rounded-4">
-                    <i class="bi bi-calendar2-check d-block fs-3 mb-2 text-primary"></i>Attendance
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="results.php" class="btn btn-light w-100 py-3 border-0 rounded-4">
-                    <i class="bi bi-file-earmark-plus d-block fs-3 mb-2 text-success"></i>Enter Marks
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="timetable.php" class="btn btn-light w-100 py-3 border-0 rounded-4">
-                    <i class="bi bi-clock d-block fs-3 mb-2 text-warning"></i>Timetable
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="messaging.php" class="btn btn-light w-100 py-3 border-0 rounded-4">
-                    <i class="bi bi-chat-dots d-block fs-3 mb-2 text-info"></i>Messages
-                </a>
+    <!-- Stat Cards -->
+    <section class="dash-stats">
+        
+        <!-- Assigned Subjects -->
+        <div class="dash-stat">
+            <div class="dash-stat-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
+            <span>Assigned Subjects</span>
+            <div class="dash-pills">
+                <?php if (empty($assigned_subjects)): ?>
+                    <span class="text-muted small fst-italic">No subjects assigned</span>
+                <?php else: ?>
+                    <?php foreach ($assigned_subjects as $sub): ?>
+                        <span class="dash-pill is-gold"><?php echo htmlspecialchars($sub); ?></span>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
-    </div>
+
+        <!-- Assigned Classes -->
+        <div class="dash-stat">
+            <div class="dash-stat-icon"><i class="bi bi-people-fill"></i></div>
+            <span>Assigned Classes</span>
+            <div class="dash-pills">
+                <?php if (empty($assigned_classes)): ?>
+                    <span class="text-muted small fst-italic">No classes assigned</span>
+                <?php else: ?>
+                    <?php foreach ($assigned_classes as $cls): ?>
+                        <span class="dash-pill"><?php echo htmlspecialchars($cls); ?></span>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Staff ID -->
+        <div class="dash-stat">
+            <div class="dash-stat-icon"><i class="bi bi-person-vcard-fill"></i></div>
+            <span>Staff ID</span>
+            <strong style="font-size: 1.6rem; font-weight: 800; color: var(--ink); margin-top: 10px;">
+                <?php echo htmlspecialchars($employee_id ?: '—'); ?>
+            </strong>
+        </div>
+
+    </section>
+
+    <!-- Quick Shortcuts Panel -->
+    <section class="panel">
+        <div class="ui-panel-head" style="padding: 0 0 20px 0;">
+            <div class="ui-panel-title">
+                <h2>Quick Shortcuts</h2>
+            </div>
+        </div>
+        
+        <div class="dash-actions">
+            <a href="attendance.php" class="dash-action">
+                <i class="bi bi-calendar2-check lead"></i> Attendance
+            </a>
+            <a href="results.php" class="dash-action">
+                <i class="bi bi-file-earmark-plus lead"></i> Enter Marks
+            </a>
+            <a href="timetable.php" class="dash-action">
+                <i class="bi bi-clock lead"></i> Timetable
+            </a>
+            <a href="messaging.php" class="dash-action">
+                <i class="bi bi-chat-dots lead"></i> Messages
+            </a>
+        </div>
+    </section>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -163,7 +309,6 @@ $active_page = 'dashboard';
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
-            // On mobile, use the overlay pattern
             if (window.innerWidth <= 992) {
                 sidebar.classList.toggle('active');
                 if (overlay) overlay.classList.toggle('active');
@@ -172,7 +317,6 @@ $active_page = 'dashboard';
             }
         });
     }
-
     if (overlay) {
         overlay.addEventListener('click', function() {
             sidebar.classList.remove('active');
@@ -187,13 +331,8 @@ $active_page = 'dashboard';
             const sub = this.nextElementSibling;
             const icon = this.querySelector('.bi-plus, .bi-dash');
             const isClosed = sub.style.display === "none" || sub.style.display === "";
-            
             sub.style.display = isClosed ? "block" : "none";
-            
-            if (icon) {
-                if (isClosed) icon.classList.replace('bi-plus', 'bi-dash');
-                else icon.classList.replace('bi-dash', 'bi-plus');
-            }
+            if (icon) icon.classList.replace(isClosed ? 'bi-plus' : 'bi-dash', isClosed ? 'bi-dash' : 'bi-plus');
         });
     });
 </script>

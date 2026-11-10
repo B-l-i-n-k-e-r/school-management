@@ -30,34 +30,41 @@ $extra_label = 'My Profile';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .profile-avatar { width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: #6366f1; font-weight: 800; font-size: 2rem; display: inline-flex; align-items: center; justify-content: center; }
-        .info-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.25rem; }
-        .info-value { font-weight: 600; color: #0f172a; margin-bottom: 0; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
+
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+        .ui-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 99px; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+        .ui-badge.is-navy { background: var(--primary-tint); color: var(--primary); }
+        .ui-badge.is-gold { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-badge.is-success { background: #e7f7ee; color: #14633a; }
+
+        .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--primary); color: var(--accent); font-weight: 800; font-size: 2.5rem; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px -5px rgba(0,10,102,0.3); }
+        
+        .info-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 6px; }
+        .info-value { font-weight: 700; color: var(--ink); font-size: 1.05rem; margin-bottom: 0; }
+
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -69,28 +76,37 @@ $extra_label = 'My Profile';
     <div class="row justify-content-center">
         <div class="col-lg-10">
 
-            <div class="card p-4 p-md-5 mb-4">
+            <div class="ui-head">
+                <div>
+                    <h1>My Profile</h1>
+                    <p>View your account details and assignments</p>
+                </div>
+            </div>
+
+            <!-- Profile Header Card -->
+            <div class="panel mb-4">
                 <div class="d-flex flex-column flex-md-row align-items-center align-items-md-start gap-4 text-center text-md-start">
                     <div class="profile-avatar">
                         <?php echo htmlspecialchars(strtoupper(substr($staff_display_name, 0, 1))); ?>
                     </div>
-                    <div>
-                        <h3 class="fw-bold mb-1"><?php echo htmlspecialchars($staff_display_name); ?></h3>
-                        <p class="text-muted mb-2"><?php echo htmlspecialchars($user_data['qualification'] ?? 'Faculty member'); ?></p>
+                    <div class="flex-grow-1">
+                        <h3 class="fw-bold mb-1" style="color: var(--ink);"><?php echo htmlspecialchars($staff_display_name); ?></h3>
+                        <p class="text-muted mb-3 fw-medium"><?php echo htmlspecialchars($user_data['qualification'] ?? 'Faculty member'); ?></p>
+                        
                         <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-start">
                             <?php if (!empty($user_data['employee_id'])): ?>
-                                <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">
-                                    <i class="bi bi-person-badge me-1"></i><?php echo htmlspecialchars($user_data['employee_id']); ?>
+                                <span class="ui-badge is-navy">
+                                    <i class="bi bi-person-badge"></i><?php echo htmlspecialchars($user_data['employee_id']); ?>
                                 </span>
                             <?php endif; ?>
                             <?php if (!empty($user_data['assigned_form'])): ?>
-                                <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2">
-                                    <i class="bi bi-mortarboard me-1"></i><?php echo htmlspecialchars($user_data['assigned_form']); ?>
+                                <span class="ui-badge is-success">
+                                    <i class="bi bi-mortarboard"></i><?php echo htmlspecialchars($user_data['assigned_form']); ?>
                                 </span>
                             <?php endif; ?>
                             <?php if (!empty($user_data['assigned_subject'])): ?>
-                                <span class="badge bg-info-subtle text-info rounded-pill px-3 py-2">
-                                    <i class="bi bi-journal-bookmark me-1"></i><?php echo htmlspecialchars($user_data['assigned_subject']); ?>
+                                <span class="ui-badge is-gold">
+                                    <i class="bi bi-journal-bookmark"></i><?php echo htmlspecialchars($user_data['assigned_subject']); ?>
                                 </span>
                             <?php endif; ?>
                         </div>
@@ -98,9 +114,10 @@ $extra_label = 'My Profile';
                 </div>
             </div>
 
-            <div class="card p-4 p-md-5">
-                <h5 class="fw-bold mb-4">
-                    <i class="bi bi-info-circle me-2 text-primary"></i>Personal Information
+            <!-- Personal Info Card -->
+            <div class="panel">
+                <h5 class="fw-bold mb-4" style="color: var(--primary);">
+                    <i class="bi bi-info-circle me-2"></i>Personal Information
                 </h5>
 
                 <div class="row g-4">
@@ -112,7 +129,7 @@ $extra_label = 'My Profile';
                         <p class="info-label">Email</p>
                         <p class="info-value">
                             <?php if (!empty($user_data['email'])): ?>
-                                <a href="mailto:<?php echo htmlspecialchars($user_data['email']); ?>" class="text-decoration-none">
+                                <a href="mailto:<?php echo htmlspecialchars($user_data['email']); ?>" class="text-decoration-none" style="color: var(--primary);">
                                     <?php echo htmlspecialchars($user_data['email']); ?>
                                 </a>
                             <?php else: ?>
@@ -144,16 +161,16 @@ $extra_label = 'My Profile';
                         <p class="info-label">Status</p>
                         <p class="info-value">
                             <?php $status = $user_data['status'] ?? 'Active'; ?>
-                            <span class="badge <?php echo $status === 'Active' ? 'bg-success' : 'bg-secondary'; ?> rounded-pill px-3 py-2">
+                            <span class="ui-badge <?php echo $status === 'Active' ? 'is-success' : 'is-navy'; ?>">
                                 <?php echo htmlspecialchars($status); ?>
                             </span>
                         </p>
                     </div>
                 </div>
 
-                <div class="border-top mt-5 pt-4 text-muted small">
-                    <i class="bi bi-shield-check me-1"></i>
-                    To update your profile or change your password, contact the school administrator.
+                <div class="border-top mt-5 pt-4 text-muted small fw-medium">
+                    <i class="bi bi-shield-check me-1 text-primary"></i>
+                    To update your profile or change your password, go to the <a href="settings.php" class="text-decoration-none fw-bold" style="color: var(--primary);">Settings</a> page.
                 </div>
             </div>
 
@@ -163,9 +180,11 @@ $extra_label = 'My Profile';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Sidebar Toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
+
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
             if (window.innerWidth <= 992) {
@@ -182,6 +201,7 @@ $extra_label = 'My Profile';
             overlay.classList.remove('active');
         });
     }
+
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();

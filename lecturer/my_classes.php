@@ -46,57 +46,61 @@ $extra_label = 'My Classes — ' . ($assigned_form ?: 'Not Assigned');
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        .sidebar { 
-            width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); 
-            color: white; position: fixed; left: 0; top: 0; overflow-y: auto; 
-            z-index: 1200; transition: all 0.3s ease;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
-        }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .panel.is-flush { padding: 0; overflow: hidden; }
+        
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
+        .ui-panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 24px 28px; }
+        .ui-panel-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .ui-panel-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; color: var(--primary); }
+        .ui-count { padding: 5px 14px; border-radius: 99px; background: var(--accent); color: var(--primary); font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
 
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { 
-            color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; 
-            display: flex; justify-content: space-between; align-items: center; 
-            text-decoration: none; transition: 0.3s; cursor: pointer;
-        }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
+        .ui-table-wrap { overflow-x: auto; }
+        .ui-table { width: 100%; border-collapse: collapse; }
+        .ui-table th { padding: 14px 18px; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); background: var(--bg-light); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ui-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 0.92rem; font-weight: 500; color: var(--text-muted); vertical-align: middle; }
+        .ui-table th:first-child, .ui-table td:first-child { padding-left: 28px; }
+        .ui-table th:last-child, .ui-table td:last-child { padding-right: 28px; }
+        .ui-table tbody tr:last-child td { border-bottom: none; }
+        .ui-table tbody tr { transition: background-color 0.2s; }
+        .ui-table tbody tr:hover { background: var(--primary-tint); }
+        .ui-table .is-center { text-align: center; }
 
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .ui-badge { display: inline-flex; padding: 5px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        .ui-badge.is-navy { background: var(--primary-tint); color: var(--primary); }
+        .ui-badge.is-gold { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-badge.is-male { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .ui-badge.is-female { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .ui-badge.is-soft { background: var(--bg-light); border: 1px solid var(--line); color: var(--text-muted); }
 
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .avatar-sm { width: 36px; height: 36px; border-radius: 50%; background: #eef2ff; color: #6366f1; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+        
+        .sf-avatar { flex-shrink: 0; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: var(--accent); font-size: 0.9rem; font-weight: 800; }
+        .ui-name { display: block; color: var(--ink); font-weight: 700; font-size: 0.95rem; }
     </style>
 </head>
 <body>
@@ -106,78 +110,66 @@ $extra_label = 'My Classes — ' . ($assigned_form ?: 'Not Assigned');
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h3 class="fw-bold mb-1">My Classes</h3>
-            <p class="text-muted small mb-0">
-                Students in
-                <strong><?php echo htmlspecialchars($assigned_form ?: 'your assigned form'); ?></strong>
-                <?php if ($assigned_subject): ?>
-                    &middot; Teaching <strong><?php echo htmlspecialchars($assigned_subject); ?></strong>
-                <?php endif; ?>
+            <h1>My Classes</h1>
+            <p>Students in <strong style="color: var(--primary);"><?php echo htmlspecialchars($assigned_form ?: 'your assigned form'); ?></strong>
+            <?php if ($assigned_subject): ?> &middot; Teaching <strong style="color: var(--primary);"><?php echo htmlspecialchars($assigned_subject); ?></strong><?php endif; ?>
             </p>
         </div>
-        <?php if (!empty($students)): ?>
-            <span class="badge rounded-pill bg-primary px-3 py-2 fw-bold">
-                <i class="bi bi-people-fill me-1"></i>
-                <?php echo count($students); ?> Student<?php echo count($students) === 1 ? '' : 's'; ?>
-            </span>
-        <?php endif; ?>
     </div>
 
-    <div class="card p-4">
+    <div class="panel is-flush">
+        <div class="ui-panel-head">
+            <div class="ui-panel-title">
+                <h2>Class Roster</h2>
+                <span class="ui-count"><?php echo count($students); ?> Student<?php echo count($students) === 1 ? '' : 's'; ?></span>
+            </div>
+        </div>
+
         <?php if (!$assigned_form): ?>
-            <div class="alert alert-warning rounded-4 mb-0">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                You don't have an assigned class yet. Ask your admin to assign you a form.
+            <div class="ui-empty">
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <p>No class assigned</p>
+                <small>Ask your admin to assign you a form.</small>
             </div>
-
         <?php elseif (empty($students)): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-people fs-1 text-muted d-block mb-3"></i>
-                <h5 class="fw-bold text-muted">No students yet</h5>
-                <p class="text-muted mb-0">
-                    Once students are enrolled in <strong><?php echo htmlspecialchars($assigned_form); ?></strong>,
-                    they'll appear here.
-                </p>
+            <div class="ui-empty">
+                <i class="bi bi-people"></i>
+                <p>No students yet</p>
+                <small>Once students are enrolled in <?php echo htmlspecialchars($assigned_form); ?>, they'll appear here.</small>
             </div>
-
         <?php else: ?>
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
+            <div class="ui-table-wrap">
+                <table class="ui-table">
                     <thead>
-                        <tr class="text-muted small text-uppercase">
-                            <th class="border-0">#</th>
-                            <th class="border-0">Student</th>
-                            <th class="border-0">Adm No</th>
-                            <th class="border-0">Gender</th>
+                        <tr>
+                            <th class="is-center" style="width: 60px;">#</th>
+                            <th>Student</th>
+                            <th>Adm No</th>
+                            <th class="is-center">Gender</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($students as $i => $s): ?>
-                            <tr class="border-bottom">
-                                <td class="text-muted small"><?php echo $i + 1; ?></td>
+                        <?php foreach ($students as $i => $s): 
+                            $gender = $s['gender'] ?? '—';
+                            $gender_class = match($gender) {
+                                'Male'   => 'is-male',
+                                'Female' => 'is-female',
+                                default  => 'is-soft',
+                            };
+                        ?>
+                            <tr>
+                                <td class="is-center text-muted fw-bold"><?php echo $i + 1; ?></td>
                                 <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="avatar-sm">
-                                            <?php echo htmlspecialchars(strtoupper(substr($s['full_name'] ?? '?', 0, 1))); ?>
-                                        </span>
-                                        <span class="fw-semibold"><?php echo htmlspecialchars($s['full_name'] ?? ''); ?></span>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="sf-avatar"><?php echo htmlspecialchars(strtoupper(substr($s['full_name'] ?? '?', 0, 1))); ?></span>
+                                        <span class="ui-name"><?php echo htmlspecialchars($s['full_name'] ?? ''); ?></span>
                                     </div>
                                 </td>
-                                <td class="fw-bold text-primary"><?php echo htmlspecialchars($s['adm_no'] ?? ''); ?></td>
-                                <td>
-                                    <?php
-                                        $gender = $s['gender'] ?? '—';
-                                        $gender_class = match($gender) {
-                                            'Male'   => 'bg-primary-subtle text-primary',
-                                            'Female' => 'bg-danger-subtle text-danger',
-                                            default  => 'bg-light text-dark',
-                                        };
-                                    ?>
-                                    <span class="badge rounded-pill <?php echo $gender_class; ?> px-3 py-2">
-                                        <?php echo htmlspecialchars($gender); ?>
-                                    </span>
+                                <td><span class="ui-badge is-navy"><?php echo htmlspecialchars($s['adm_no'] ?? ''); ?></span></td>
+                                <td class="is-center">
+                                    <span class="ui-badge <?php echo $gender_class; ?>"><?php echo htmlspecialchars($gender); ?></span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

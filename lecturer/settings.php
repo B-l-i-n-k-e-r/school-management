@@ -31,7 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $upd->bind_param("si", $new_phone, $staff_id);
     if ($upd->execute()) {
         $success_msg = 'Phone number updated successfully.';
-        // Refresh
         $user_data['phone'] = $new_phone;
     } else {
         $error_msg = 'Failed to update profile.';
@@ -77,65 +76,50 @@ $extra_label = 'Settings';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        .sidebar { 
-            width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); 
-            color: white; position: fixed; left: 0; top: 0; overflow-y: auto; 
-            z-index: 1200; transition: all 0.3s ease;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
-        }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
+        .ui-btn.is-navy { background: var(--primary); color: var(--white); }
+        .ui-btn.is-navy:hover { background: var(--primary-soft); color: var(--white); }
 
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { 
-            color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; 
-            display: flex; justify-content: space-between; align-items: center; 
-            text-decoration: none; transition: 0.3s; cursor: pointer;
-        }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
 
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .ui-field label { display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: all 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
+        .ui-input[readonly] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
 
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        /* Card Styles */
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .section-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; }
-        .form-label { font-size: 0.85rem; font-weight: 700; color: #334155; }
-        .form-control { border-radius: 12px; padding: 12px 15px; border: 1px solid #e2e8f0; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
-        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
-        .form-control[readonly] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
-
-        .btn-primary { background: var(--primary-blue); border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-        .btn-dark { border-radius: 12px; padding: 12px 24px; font-weight: 700; transition: 0.3s; }
-        .btn-dark:hover { transform: translateY(-2px); }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        .section-title { font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
             .main-content { padding: 20px; }
         }
     </style>
@@ -147,56 +131,51 @@ $extra_label = 'Settings';
 
 <main class="main-content">
 
-    <div class="mb-4">
-        <h3 class="fw-bold mb-1">Account Settings</h3>
-        <p class="text-muted small mb-0">Manage your contact details and account security</p>
+    <div class="ui-head">
+        <div>
+            <h1>Account Settings</h1>
+            <p>Manage your contact details and account security</p>
+        </div>
     </div>
 
     <?php if ($success_msg): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <span class="fw-medium"><?php echo htmlspecialchars($success_msg); ?></span>
-        </div>
+        <div class="ui-alert is-success"><i class="bi bi-check-circle-fill"></i><div><?php echo htmlspecialchars($success_msg); ?></div></div>
     <?php endif; ?>
     <?php if ($error_msg): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
-            <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
-            <span class="fw-medium"><?php echo htmlspecialchars($error_msg); ?></span>
-        </div>
+        <div class="ui-alert is-danger"><i class="bi bi-exclamation-circle-fill"></i><div><?php echo htmlspecialchars($error_msg); ?></div></div>
     <?php endif; ?>
 
     <div class="row g-4">
         <!-- Profile card -->
         <div class="col-lg-7">
-            <div class="card p-4 p-md-5 h-100">
-                <p class="section-title"><i class="bi bi-person-fill me-1"></i> Profile Information</p>
+            <div class="panel h-100">
+                <h5 class="section-title"><i class="bi bi-person-fill" style="color: var(--primary);"></i> Profile Information</h5>
 
                 <form method="POST">
-                    <div class="mb-4">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($staff_display_name); ?>" readonly>
-                        <small class="text-muted mt-1 d-block">Contact admin to change your legal name.</small>
+                    <div class="ui-field mb-4">
+                        <label>Full Name</label>
+                        <input type="text" class="ui-input" value="<?php echo htmlspecialchars($staff_display_name); ?>" readonly>
+                        <small class="text-muted mt-2 d-block fw-medium">Contact admin to change your legal name.</small>
                     </div>
 
                     <div class="row g-4">
-                        <div class="col-md-6">
-                            <label class="form-label">Email Address</label>
-                            <!-- Email is now Read-Only -->
-                            <input type="email" class="form-control" 
+                        <div class="col-md-6 ui-field">
+                            <label>Email Address</label>
+                            <input type="email" class="ui-input" 
                                    value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>" readonly>
-                            <small class="text-muted mt-1 d-block">Email is managed by the school administration.</small>
+                            <small class="text-muted mt-2 d-block fw-medium">Managed by the school administration.</small>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Phone Number</label>
-                            <input type="text" name="phone" class="form-control"
+                        <div class="col-md-6 ui-field">
+                            <label>Phone Number</label>
+                            <input type="text" name="phone" class="ui-input"
                                    value="<?php echo htmlspecialchars($user_data['phone'] ?? ''); ?>"
                                    placeholder="07..." required>
                         </div>
                     </div>
 
                     <div class="mt-5 text-end">
-                        <button type="submit" name="update_profile" class="btn btn-primary shadow-sm">
-                            <i class="bi bi-save me-2"></i>Save Changes
+                        <button type="submit" name="update_profile" class="ui-btn is-primary">
+                            <i class="bi bi-save-fill"></i> Save Changes
                         </button>
                     </div>
                 </form>
@@ -205,25 +184,23 @@ $extra_label = 'Settings';
 
         <!-- Password card -->
         <div class="col-lg-5">
-            <div class="card p-4 p-md-5 h-100">
-                <p class="section-title"><i class="bi bi-shield-lock-fill me-1"></i> Security</p>
+            <div class="panel h-100">
+                <h5 class="section-title"><i class="bi bi-shield-lock-fill" style="color: var(--primary);"></i> Security</h5>
 
                 <form method="POST">
-                    <!-- Current Password Field Removed -->
-                    
-                    <div class="mb-4">
-                        <label class="form-label">New Password</label>
-                        <input type="password" name="new_password" class="form-control" required minlength="6" placeholder="Enter new password">
-                        <small class="text-muted mt-1 d-block">At least 6 characters.</small>
+                    <div class="ui-field mb-4">
+                        <label>New Password</label>
+                        <input type="password" name="new_password" class="ui-input" required minlength="6" placeholder="Enter new password">
+                        <small class="text-muted mt-2 d-block fw-medium">At least 6 characters.</small>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label">Confirm New Password</label>
-                        <input type="password" name="confirm_password" class="form-control" required minlength="6" placeholder="Repeat new password">
+                    <div class="ui-field mb-4">
+                        <label>Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="ui-input" required minlength="6" placeholder="Repeat new password">
                     </div>
 
                     <div class="mt-5 text-end">
-                        <button type="submit" name="change_password" class="btn btn-dark shadow-sm">
-                            <i class="bi bi-key-fill me-2"></i>Update Password
+                        <button type="submit" name="change_password" class="ui-btn is-navy">
+                            <i class="bi bi-key-fill"></i> Update Password
                         </button>
                     </div>
                 </form>

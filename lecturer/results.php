@@ -5,7 +5,6 @@ error_reporting(E_ALL);
 session_start();
 include('../database/db_connect.php');
 
-// Session protection
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
     header("Location: staffLogin.php");
     exit();
@@ -47,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
     } elseif (empty($marks_array)) {
         $error_msg = 'No marks entered.';
     } else {
-        // Search by exam_name
         $exam_id = 0;
         $exam_lookup = $conn->prepare("SELECT exam_id FROM exams WHERE exam_name = ? LIMIT 1");
         $exam_lookup->bind_param("s", $exam_type);
@@ -61,7 +59,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
             $error_msg = "Error: The selected Exam does not exist in the database.";
         }
 
-        // Only proceed if we found a valid exam_id
         if ($exam_id > 0) {
             $saved = 0;
             foreach ($marks_array as $student_id => $score) {
@@ -70,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
                 $student_id = (int) $student_id;
                 $score      = (float) $score;
 
-                // Calculate Grade and Remarks automatically
                 if ($score >= 80)      { $grade = 'A'; $remarks = 'Excellent'; }
                 elseif ($score >= 75)  { $grade = 'A-'; $remarks = 'Very Good'; }
                 elseif ($score >= 70)  { $grade = 'B+'; $remarks = 'Good'; }
@@ -84,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
                 elseif ($score >= 30)  { $grade = 'D-'; $remarks = 'Very Weak'; }
                 else                   { $grade = 'E'; $remarks = 'Fail'; }
 
-                // Check if result exists for this student, subject AND exam
                 $check = $conn->prepare("SELECT result_id FROM results WHERE student_id = ? AND subject_id = ? AND exam_id = ? LIMIT 1");
                 $check->bind_param("iii", $student_id, $subject_id, $exam_id);
                 $check->execute();
@@ -111,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_results'])) {
     }
 }
 
-// Fetch students in this teacher's class
+// Fetch students
 $students = [];
 if ($assigned_form) {
     $stmt = $conn->prepare("SELECT student_id, full_name, adm_no FROM students WHERE form = ? ORDER BY full_name ASC");
@@ -122,7 +117,7 @@ if ($assigned_form) {
     $stmt->close();
 }
 
-// Fetch available exams to populate the dropdown dynamically
+// Fetch exams
 $exams = [];
 $exam_query = $conn->query("SELECT exam_id, exam_name FROM exams");
 if ($exam_query) {
@@ -143,59 +138,88 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        .sidebar { 
-            width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); 
-            color: white; position: fixed; left: 0; top: 0; overflow-y: auto; 
-            z-index: 1200; transition: all 0.3s ease;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5a71 var(--sidebar-bg);
+        .panel {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22);
         }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
 
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { 
-            color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; 
-            display: flex; justify-content: space-between; align-items: center; 
-            text-decoration: none; transition: 0.3s; cursor: pointer;
+        .ui-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px;
+            font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2;
+            text-decoration: none; cursor: pointer; transition: background 0.2s, transform 0.2s, box-shadow 0.2s, color 0.2s;
         }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
 
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
+        .ui-alert.is-warning { background: var(--accent-tint); color: var(--accent-deep); }
 
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
+        .panel.is-flush { padding: 0; overflow: hidden; }
+        .ui-panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 24px 28px; }
+        .ui-panel-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .ui-panel-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; color: var(--primary); }
+        .ui-count { padding: 5px 14px; border-radius: 99px; background: var(--accent); color: var(--primary); font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
 
-        .results-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .table th, .table td { white-space: nowrap; padding: 12px 20px; }
-        .table th:nth-child(2), .table td:nth-child(2) { white-space: normal; }
-        .mark-input { width: 90px; text-align: center; font-weight: 700; border-radius: 8px; border: 1px solid #dee2e6; padding: 6px; }
+        .ui-table-wrap { overflow-x: auto; }
+        .ui-table { width: 100%; border-collapse: collapse; }
+        .ui-table th { padding: 14px 18px; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); background: var(--bg-light); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ui-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 0.92rem; font-weight: 500; color: var(--text-muted); vertical-align: middle; }
+        .ui-table th:first-child, .ui-table td:first-child { padding-left: 28px; }
+        .ui-table th:last-child,  .ui-table td:last-child  { padding-right: 28px; }
+        .ui-table tbody tr:last-child td { border-bottom: none; }
+        .ui-table tbody tr { transition: background-color 0.2s; }
+        .ui-table tbody tr:hover { background: var(--primary-tint); }
+        .ui-table .is-center { text-align: center; }
+        .ui-name { display: block; color: var(--ink); font-weight: 700; font-size: 0.95rem; }
 
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        .ui-search { position: relative; width: 260px; max-width: 100%; }
+        .ui-search i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .ui-search input { width: 100%; box-sizing: border-box; padding: 11px 16px 11px 42px; border: 1.5px solid var(--line); border-radius: 99px; background: var(--bg-light); font-family: inherit; font-size: 0.9rem; color: var(--ink); }
+        .ui-search input:focus { outline: none; border-color: var(--primary); background: var(--white); }
 
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
+
+        .mark-input { width: 90px; text-align: center; font-weight: 800; font-size: 1rem; border-radius: 12px; border: 1.5px solid var(--line); padding: 10px; background: var(--bg-light); color: var(--primary); transition: all 0.2s; }
+        .mark-input:focus { outline: none; border-color: var(--primary); background: var(--white); box-shadow: 0 0 0 4px rgba(0,10,102,0.1); }
+        
+        .results-table th:nth-child(1) { width: 20%; }
+        .results-table th:nth-child(2) { width: 40%; }
+        .results-table th:nth-child(3) { width: 40%; text-align: center; }
     </style>
 </head>
 <body>
@@ -204,51 +228,57 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <?php if ($success_msg): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?php echo htmlspecialchars($success_msg); ?>
+
+    <div class="ui-head">
+        <div>
+            <h1>Mark Entry</h1>
+            <p>Enter marks for <strong style="color: var(--primary);"><?php echo htmlspecialchars($assigned_subject_name ?: 'your subject'); ?></strong> in <strong style="color: var(--primary);"><?php echo htmlspecialchars($assigned_form ?: 'your class'); ?></strong>.</p>
         </div>
+    </div>
+
+    <?php if ($success_msg): ?>
+        <div class="ui-alert is-success"><i class="bi bi-check-circle-fill"></i><div><?php echo htmlspecialchars($success_msg); ?></div></div>
     <?php endif; ?>
     <?php if ($error_msg): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
-            <i class="bi bi-exclamation-circle-fill me-2"></i> <?php echo $error_msg; ?>
-        </div>
+        <div class="ui-alert is-danger"><i class="bi bi-exclamation-circle-fill"></i><div><?php echo htmlspecialchars($error_msg); ?></div></div>
     <?php endif; ?>
 
-    <div class="results-card p-4">
-        <div class="mb-4">
-            <h4 class="fw-bold mb-1">
-                Subject: <?php echo htmlspecialchars($assigned_subject_name ?: 'Not Assigned'); ?>
-            </h4>
-            <p class="text-muted small mb-0">
-                Enter marks for students in <strong><?php echo htmlspecialchars($assigned_form ?: 'your class'); ?></strong>
-            </p>
-        </div>
-
+    <div class="panel is-flush">
         <?php if (!$assigned_form || !$assigned_subject_name): ?>
-            <div class="alert alert-warning rounded-4">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                You need both an assigned <strong>class</strong> and <strong>subject</strong> to enter marks.
-                Ask your admin to update your profile.
+            <div class="ui-empty">
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <p>Missing Assignment</p>
+                <small>You need both an assigned class and subject to enter marks. Ask your admin.</small>
             </div>
         <?php elseif (empty($students)): ?>
-            <div class="alert alert-info rounded-4">
-                <i class="bi bi-info-circle me-2"></i>
-                No students found in <strong><?php echo htmlspecialchars($assigned_form); ?></strong>.
+            <div class="ui-empty">
+                <i class="bi bi-people text-muted"></i>
+                <p>No students found</p>
+                <small>No students are currently enrolled in <?php echo htmlspecialchars($assigned_form); ?>.</small>
             </div>
         <?php elseif (empty($exams)): ?>
-            <div class="alert alert-danger rounded-4">
-                <i class="bi bi-exclamation-octagon me-2"></i>
-                <strong>No Exams Found!</strong> You cannot enter results until an Admin creates an exam in the Exams module.
+            <div class="ui-empty">
+                <i class="bi bi-exclamation-octagon text-danger"></i>
+                <p>No Exams Found</p>
+                <small>You cannot enter results until an Admin creates an exam in the Exams module.</small>
             </div>
         <?php else: ?>
             <form method="POST">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-5">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Select Exam</label>
-                        <select name="exam_type" class="form-select border-0 bg-light rounded-3" required>
-                            <option value="" disabled selected>Choose an exam...</option>
-                            <!-- FIX: Added !empty check to prevent null errors -->
+                
+                <div class="ui-panel-head">
+                    <div class="ui-panel-title">
+                        <h2>Student Marks</h2>
+                        <span class="ui-count"><?php echo count($students); ?> Students</span>
+                    </div>
+                    
+                    <div class="d-flex gap-3 align-items-center w-100 justify-content-end" style="max-width: 600px;">
+                        <label class="ui-search w-100" style="max-width: 250px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" id="studentSearch" placeholder="Search student...">
+                        </label>
+                        
+                        <select name="exam_type" class="ui-input form-select" style="width: 250px;" required>
+                            <option value="" disabled selected>Select Exam...</option>
                             <?php foreach ($exams as $exam): ?>
                                 <?php if (!empty($exam['exam_name'])): ?>
                                     <option value="<?php echo htmlspecialchars($exam['exam_name']); ?>">
@@ -260,20 +290,24 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
                     </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                <div class="ui-table-wrap">
+                    <table class="ui-table results-table" id="resultsTable">
                         <thead>
-                            <tr class="text-muted small text-uppercase">
-                                <th class="border-0">Adm No</th>
-                                <th class="border-0">Student Name</th>
-                                <th class="border-0 text-center">Marks (0-100)</th>
+                            <tr>
+                                <th>Adm No</th>
+                                <th>Student Name</th>
+                                <th class="text-center">Marks (0-100)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($students as $row): ?>
-                            <tr class="border-bottom">
-                                <td class="fw-bold"><?php echo htmlspecialchars($row['adm_no'] ?? ''); ?></td>
-                                <td class="fw-500"><?php echo htmlspecialchars($row['full_name'] ?? ''); ?></td>
+                            <tr>
+                                <td class="fw-bold" style="color: var(--primary); font-size: 1rem;">
+                                    <?php echo htmlspecialchars($row['adm_no'] ?? ''); ?>
+                                </td>
+                                <td class="fw-bold text-dark" style="font-size: 1rem;">
+                                    <?php echo htmlspecialchars($row['full_name'] ?? ''); ?>
+                                </td>
                                 <td class="text-center">
                                     <input type="number"
                                            name="marks[<?php echo (int)$row['student_id']; ?>]"
@@ -286,9 +320,9 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
                     </table>
                 </div>
 
-                <div class="mt-4 text-center">
-                    <button type="submit" name="save_results" class="btn btn-primary px-5 py-2 rounded-pill fw-bold shadow-sm">
-                        <i class="bi bi-save me-2"></i> Save All Results
+                <div class="p-4 text-end border-top">
+                    <button type="submit" name="save_results" class="ui-btn is-primary px-5 py-3" style="font-size: 1.05rem;">
+                        <i class="bi bi-save-fill"></i> Save All Results
                     </button>
                 </div>
             </form>
@@ -298,6 +332,7 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Sidebar Toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -327,6 +362,15 @@ $extra_label = $assigned_form ? 'Mark Entry: ' . $assigned_form : 'No class assi
             const isClosed = sub.style.display === "none" || sub.style.display === "";
             sub.style.display = isClosed ? "block" : "none";
             if (icon) icon.classList.replace(isClosed ? 'bi-plus' : 'bi-dash', isClosed ? 'bi-dash' : 'bi-plus');
+        });
+    });
+
+    // Live Search
+    document.getElementById('studentSearch')?.addEventListener('input', function(e) {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('#resultsTable tbody tr').forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(term) ? '' : 'none';
         });
     });
 </script>

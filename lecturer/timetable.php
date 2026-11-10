@@ -21,7 +21,6 @@ $time_slots = [];
 $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 if ($assigned_form) {
-    // Fetch data and join subjects
     $stmt = $conn->prepare("
         SELECT t.*, s.subject_name 
         FROM timetable t 
@@ -33,19 +32,15 @@ if ($assigned_form) {
     $res = $stmt->get_result();
     
     while ($row = $res->fetch_assoc()) {
-        // Combine start_time and end_time into a single string
         $start = date("H:i", strtotime($row['start_time']));
         $end = date("H:i", strtotime($row['end_time']));
         $time_val = "$start - $end";
-        
         $day_val = $row['day_of_week'];
         
         $time_slots[$time_val] = $time_val; 
         $timetable_data[$day_val][$time_val] = $row;
     }
     $stmt->close();
-    
-    // Sort time slots chronologically
     ksort($time_slots);
 }
 
@@ -61,103 +56,64 @@ $extra_label = $assigned_form ? 'Class Schedule: ' . $assigned_form : 'No class 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
+        /* Shared styles from your sample */
+        :root {
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        /* Sidebar Styles */
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 12px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; border-radius: 5px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
-        .nav-item-container { border-bottom: 1px solid #4a5568; }
-        .nav-link-custom { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link-custom:hover, .nav-link-custom.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 55px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 70px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        /* Modern Card & Table Styles */
-        .modern-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 30px; overflow: hidden; }
-        
-        .timetable-table { width: 100%; border-collapse: separate; border-spacing: 4px; }
-        .timetable-table th { background: var(--primary-blue); color: white; padding: 15px; border-radius: 8px; text-align: center; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .timetable-table td { background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; vertical-align: middle; border: 1px solid #e2e8f0; transition: 0.2s; }
-        .timetable-table td:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-color: #cbd5e1; }
-        
-        .time-slot-col { background: #e2e8f0 !important; font-weight: 700; color: #475569; white-space: nowrap; width: 150px; }
-        
-        .subject-name { font-weight: 700; color: var(--primary-blue); display: block; margin-bottom: 4px; font-size: 0.95rem; }
-        .room-name { font-size: 0.75rem; color: #64748b; display: block; margin-top: 4px; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
 
-        .empty-slot { color: #94a3b8; font-size: 0.8rem; font-style: italic; }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+
+        /* Custom Timetable Grid */
+        .timetable-table { width: 100%; border-collapse: separate; border-spacing: 6px; }
+        .timetable-table th { background: var(--primary); color: var(--white); padding: 14px; border-radius: 12px; text-align: center; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+        .timetable-table td { background: var(--bg-light); border-radius: 12px; padding: 12px; text-align: center; border: 1.5px solid var(--line); position: relative; vertical-align: top; height: 90px; }
+        .time-slot-col { background: var(--primary-tint) !important; font-weight: 800; color: var(--primary); width: 140px; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+        
+        .tt-lesson { background: var(--white); padding: 10px; border-radius: 10px; border-left: 4px solid var(--accent); text-align: left; box-shadow: 0 4px 12px -4px rgba(0,10,102,0.15); height: 100%; display: flex; flex-direction: column; justify-content: center; }
+        .tt-lesson .subj { font-weight: 800; color: var(--primary); display: block; font-size: 0.85rem; margin-bottom: 2px; }
+        .tt-lesson .teach { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
             .main-content { padding: 20px; }
             .table-responsive-custom { overflow-x: auto; }
         }
 
-        /* --- PRINT STYLES --- */
+        /* PRINT STYLES */
         @media print {
-            /* Hide non-printable elements */
-            .sidebar, .topbar, .sidebar-overlay, .no-print, footer, .alert {
-                display: none !important;
-            }
-            /* Reset layout constraints */
-            body, html {
-                background-color: #fff !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .main-content {
-                margin-left: 0 !important;
-                padding: 0 !important;
-            }
-            /* Make the card flat */
-            .modern-card {
-                box-shadow: none !important;
-                border: none !important;
-                padding: 0 !important;
-            }
-            /* Print header */
-            .print-header {
-                display: block !important;
-                text-align: center;
-                margin-bottom: 20px;
-                border-bottom: 2px solid #000;
-                padding-bottom: 10px;
-            }
-            /* Table border fixes for printing */
-            .timetable-table th {
-                background-color: #f1f5f9 !important;
-                color: #000 !important;
-                border: 1px solid #000 !important;
-                border-radius: 0 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .timetable-table td {
-                border: 1px solid #000 !important;
-                border-radius: 0 !important;
-                background: transparent !important;
-                color: #000 !important;
-            }
+            .sidebar, .topbar, .sidebar-overlay, .no-print, footer, .alert { display: none !important; }
+            body, html { background-color: #fff !important; margin: 0 !important; padding: 0 !important; }
+            .main-content { margin-left: 0 !important; padding: 0 !important; }
+            .panel { box-shadow: none !important; border: none !important; padding: 0 !important; }
+            .print-header { display: block !important; text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .timetable-table th { background-color: #f1f5f9 !important; color: #000 !important; border: 1px solid #000 !important; border-radius: 0 !important; }
+            .timetable-table td { border: 1px solid #000 !important; border-radius: 0 !important; background: transparent !important; color: #000 !important; }
             .subject-name { color: #000 !important; }
             .time-slot-col { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
@@ -169,41 +125,37 @@ $extra_label = $assigned_form ? 'Class Schedule: ' . $assigned_form : 'No class 
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1 no-print">Weekly Timetable</h2>
-            <p class="text-muted small mb-0 no-print">Master schedule for <strong><?php echo htmlspecialchars($assigned_form ?: 'your class'); ?></strong></p>
+            <h1>Weekly Timetable</h1>
+            <p>Master schedule for <strong style="color: var(--primary);"><?php echo htmlspecialchars($assigned_form ?: 'your class'); ?></strong></p>
         </div>
-        
-        <!-- Print Button -->
         <?php if (!empty($timetable_data)): ?>
-            <button onclick="window.print()" class="btn btn-primary rounded-pill px-4 shadow-sm no-print">
-                <i class="bi bi-printer-fill me-2"></i> Print Timetable
+            <button onclick="window.print()" class="ui-btn is-primary no-print">
+                <i class="bi bi-printer-fill"></i> Print Timetable
             </button>
         <?php endif; ?>
     </div>
 
-    <!-- Header shown ONLY when printing -->
     <div class="print-header" style="display: none;">
         <h3 class="fw-bold mb-1">The Michaelson School</h3>
         <h5 class="mb-0">Weekly Timetable: <?php echo htmlspecialchars($assigned_form); ?></h5>
         <small>Generated on <?php echo date('d M Y'); ?></small>
     </div>
 
-    <div class="modern-card">
+    <div class="panel">
         <?php if (!$assigned_form): ?>
-            <div class="alert alert-warning border-0 rounded-4 p-4 text-center">
-                <i class="bi bi-exclamation-triangle-fill fs-2 text-warning mb-3 d-block"></i>
-                <h5 class="fw-bold">No Class Assigned</h5>
-                <p class="mb-0 text-muted">You need to be assigned to a class by the Admin to view a timetable.</p>
+            <div class="ui-empty">
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <p>No class assigned</p>
+                <small>Ask your admin to assign you a form.</small>
             </div>
         <?php elseif (empty($timetable_data)): ?>
-            <div class="text-center py-5">
-                <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
-                    <i class="bi bi-calendar-x fs-1 text-muted"></i>
-                </div>
-                <h5 class="fw-bold text-dark">No timetable yet</h5>
-                <p class="text-muted mb-0">Once the admin publishes a timetable for <strong><?php echo htmlspecialchars($assigned_form); ?></strong>, lessons will appear here.</p>
+            <div class="ui-empty">
+                <i class="bi bi-calendar-x"></i>
+                <p>No timetable yet</p>
+                <small>Once the admin publishes a timetable for <?php echo htmlspecialchars($assigned_form); ?>, lessons will appear here.</small>
             </div>
         <?php else: ?>
             <div class="table-responsive-custom">
@@ -219,29 +171,22 @@ $extra_label = $assigned_form ? 'Class Schedule: ' . $assigned_form : 'No class 
                     <tbody>
                         <?php foreach ($time_slots as $time): ?>
                             <tr>
-                                <!-- Time Column -->
                                 <td class="time-slot-col">
                                     <i class="bi bi-clock me-1"></i> <?php echo htmlspecialchars($time); ?>
                                 </td>
-                                
-                                <!-- Days Loop -->
                                 <?php foreach ($days as $day): ?>
                                     <td>
-                                        <?php 
-                                        // Check if a lesson exists for this day and time
-                                        if (isset($timetable_data[$day][$time])): 
+                                        <?php if (isset($timetable_data[$day][$time])): 
                                             $lesson = $timetable_data[$day][$time];
                                             $subj = $lesson['subject_name'] ?? 'Lesson';
                                             $room = $lesson['room_no'] ?? '';
                                         ?>
-                                            <span class="subject-name"><?php echo htmlspecialchars($subj); ?></span>
-                                            
-                                            <?php if (!empty($room)): ?>
-                                                <span class="room-name"><i class="bi bi-geo-alt-fill"></i> <?php echo htmlspecialchars($room); ?></span>
-                                            <?php endif; ?>
-                                            
-                                        <?php else: ?>
-                                            <span class="empty-slot">- Free -</span>
+                                            <div class="tt-lesson">
+                                                <span class="subj"><?php echo htmlspecialchars($subj); ?></span>
+                                                <?php if (!empty($room)): ?>
+                                                    <span class="teach"><i class="bi bi-geo-alt-fill"></i> <?php echo htmlspecialchars($room); ?></span>
+                                                <?php endif; ?>
+                                            </div>
                                         <?php endif; ?>
                                     </td>
                                 <?php endforeach; ?>
@@ -256,7 +201,7 @@ $extra_label = $assigned_form ? 'Class Schedule: ' . $assigned_form : 'No class 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Sidebar Toggle Logic
+    // Sidebar Toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -278,7 +223,6 @@ $extra_label = $assigned_form ? 'Class Schedule: ' . $assigned_form : 'No class 
         });
     }
 
-    // Submenu Toggle Logic
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();

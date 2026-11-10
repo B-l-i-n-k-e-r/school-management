@@ -1,145 +1,180 @@
 <?php
 /**
- * Shared Lecturer Topbar
+ * Shared Lecturer Topbar (Matching Admin UI)
  * Expected variables before include:
  *   $staff_display_name — string
  *   $extra_label — string (optional)
- *   $page_title — string (optional fallback)
  */
 $staff_display_name = $staff_display_name ?? 'Staff';
-$page_title         = $page_title         ?? '';
 $extra_label        = $extra_label        ?? '';
 ?>
 <style>
-    /* Topbar specific styles to match the modern UI */
-    .topbar { 
-        margin-left: var(--sidebar-width); 
-        background: #fff; 
-        height: 70px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        padding: 0 30px; 
-        border-bottom: 1px solid #e2e8f0; 
-        transition: all 0.3s ease; 
+    .topbar {
         position: sticky;
         top: 0;
-        z-index: 1100;
+        z-index: 1000;
+        margin-left: var(--sidebar-width, 268px);
+        height: 72px;
+        padding: 0 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line, #e3e6f2);
+        transition: margin-left 0.3s ease;
     }
-    
-    .topbar-user-btn {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 50px;
-        padding: 5px 15px 5px 5px;
+    @media (max-width: 992px) {
+        .topbar { padding: 0 20px; margin-left: 0 !important; }
+    }
+
+    .topbar-burger {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line, #e3e6f2);
+        border-radius: 12px;
+        background: var(--white, #fff);
+        color: var(--primary, #000a66);
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .topbar-burger:hover { background: var(--primary-tint, #eef0ff); }
+
+    .topbar-title {
+        margin-left: 16px;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: var(--primary, #000a66);
+    }
+
+    .topbar .user-dropdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 99px;
+        background: var(--primary, #000a66);
+        color: var(--white, #fff);
+        font-family: inherit;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        transition: background 0.2s;
+    }
+    .topbar .user-dropdown:hover,
+    .topbar .user-dropdown:focus,
+    .topbar .user-dropdown.show {
+        background: var(--primary-soft, #1a2590);
+        color: var(--white, #fff);
+    }
+    .topbar .user-dropdown i { color: var(--accent, #facc15); font-size: 1.05rem; }
+
+    .topbar .dropdown-menu {
+        min-width: 230px;
+        margin-top: 10px !important;
+        padding: 8px;
+        border: 1px solid var(--line, #e3e6f2);
+        border-radius: 18px;
+        box-shadow: 0 24px 40px -16px rgba(0, 10, 102, 0.3);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .topbar-user {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 10px 12px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--line, #e3e6f2);
+    }
+    .topbar-avatar {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--primary, #000a66);
+        color: var(--accent, #facc15);
+        font-size: 1.1rem;
+    }
+    .topbar-user strong {
+        display: block;
+        max-width: 150px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--ink, #14183a);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .topbar-user span {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--text-muted, #5b6280);
+    }
+    .topbar .dropdown-item {
         display: flex;
         align-items: center;
         gap: 10px;
-        transition: all 0.2s;
-        text-decoration: none;
-        color: var(--text);
-    }
-    
-    .topbar-user-btn:hover {
-        background: #f1f5f9;
-        border-color: #cbd5e1;
-    }
-    
-    .topbar-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-        color: #4338ca;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        font-size: 0.9rem;
-    }
-
-    .dropdown-menu-modern {
-        border: none;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-        padding: 8px;
-        min-width: 240px;
-    }
-    
-    .dropdown-item-modern {
+        padding: 10px 12px;
         border-radius: 10px;
-        padding: 10px 15px;
-        font-weight: 600;
-        color: #475569;
-        transition: 0.2s;
         font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--ink, #14183a);
     }
-    
-    .dropdown-item-modern:hover {
-        background: #f1f5f9;
-        color: var(--primary-blue);
-    }
-    
-    .dropdown-item-modern.danger:hover {
-        background: #fef2f2;
-        color: #dc2626;
-    }
+    .topbar .dropdown-item i { color: var(--primary, #000a66); }
+    .topbar .dropdown-item:hover { background: var(--primary-tint, #eef0ff); color: var(--ink, #14183a); }
+    .topbar .dropdown-item.is-danger,
+    .topbar .dropdown-item.is-danger i { color: #b42318; }
+    .topbar .dropdown-item.is-danger:hover { background: #fdeaea; }
+    .topbar .dropdown-divider { margin: 6px 4px; border-color: var(--line, #e3e6f2); }
 </style>
 
 <div class="topbar">
     <div class="d-flex align-items-center">
-        <i class="bi bi-list me-3" id="sidebarToggle" style="cursor:pointer; font-size:1.6rem; color:var(--primary-blue);"></i>
+        <button type="button" class="topbar-burger" id="hamburger" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
         <?php if ($extra_label): ?>
-            <h5 class="fw-bold mb-0 text-dark d-none d-md-inline" style="font-size: 1.1rem;"><?php echo htmlspecialchars($extra_label); ?></h5>
-        <?php elseif ($page_title): ?>
-            <h5 class="fw-bold mb-0 text-dark d-none d-md-inline" style="font-size: 1.1rem;"><?php echo htmlspecialchars($page_title); ?></h5>
+            <span class="topbar-title d-none d-md-inline"><?php echo htmlspecialchars($extra_label); ?></span>
         <?php endif; ?>
     </div>
 
     <div class="dropdown">
-        <button class="topbar-user-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <div class="topbar-avatar">
-                <?php echo htmlspecialchars(strtoupper(substr($staff_display_name, 0, 1))); ?>
-            </div>
-            <span class="fw-bold small d-none d-sm-inline"><?php echo htmlspecialchars($staff_display_name); ?></span>
+        <button class="user-dropdown dropdown-toggle text-uppercase" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle"></i>
+            <?php echo htmlspecialchars($staff_display_name); ?>
         </button>
-
-        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-modern mt-2">
-            <!-- User Header -->
-            <li class="px-3 py-3 border-bottom mb-2">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="topbar-avatar" style="width: 45px; height: 45px; font-size: 1.2rem;">
-                        <?php echo htmlspecialchars(strtoupper(substr($staff_display_name, 0, 1))); ?>
-                    </div>
-                    <div class="lh-sm">
-                        <div class="fw-bold text-dark text-truncate" style="max-width:150px;">
-                            <?php echo htmlspecialchars($staff_display_name); ?>
-                        </div>
-                        <div class="text-muted small">
-                            <i class="bi bi-shield-check text-success me-1"></i>Staff Account
-                        </div>
-                    </div>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li class="topbar-user">
+                <div class="topbar-avatar"><i class="bi bi-person-fill"></i></div>
+                <div>
+                    <strong><?php echo htmlspecialchars($staff_display_name); ?></strong>
+                    <span>Staff Member</span>
                 </div>
             </li>
-
-            <!-- Links -->
             <li>
-                <a class="dropdown-item dropdown-item-modern d-flex align-items-center gap-2" href="profile.php">
-                    <i class="bi bi-person-circle fs-5 text-primary"></i> My Profile
+                <a class="dropdown-item" href="profile.php">
+                    <i class="bi bi-person-circle"></i> My Profile
                 </a>
             </li>
             <li>
-                <a class="dropdown-item dropdown-item-modern d-flex align-items-center gap-2" href="settings.php">
-                    <i class="bi bi-gear-fill fs-5 text-secondary"></i> Account Settings
+                <a class="dropdown-item" href="settings.php">
+                    <i class="bi bi-gear-fill"></i> Settings
                 </a>
             </li>
-
-            <li><hr class="dropdown-divider opacity-50"></li>
-
-            <!-- Logout -->
+            <li><hr class="dropdown-divider"></li>
             <li>
-                <a class="dropdown-item dropdown-item-modern danger d-flex align-items-center gap-2" href="../admin/adminLogOut.php">
-                    <i class="bi bi-box-arrow-right fs-5"></i> Sign Out
+                <!-- Note: Changed to staff logout -->
+                <a class="dropdown-item is-danger" href="staffLogout.php">
+                    <i class="bi bi-box-arrow-right"></i> Sign out
                 </a>
             </li>
         </ul>
