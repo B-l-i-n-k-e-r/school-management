@@ -12,8 +12,10 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
 }
 
 $staff_id = (int) $_SESSION['user_id'];
-$staff_query = $conn->query("SELECT full_name, assigned_form FROM teachers WHERE teacher_id = $staff_id");
+$staff_query = $conn->query("SELECT full_name, email, assigned_form FROM teachers WHERE teacher_id = $staff_id");
 $staff_data = $staff_query->fetch_assoc() ?: [];
+$staff_name  = $staff_data['full_name'] ?? 'Staff';
+$staff_email = $staff_data['email'] ?? '';
 $assigned_form = $staff_data['assigned_form'] ?? '';
 
 $success_msg = '';
@@ -29,11 +31,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['log_incident'])) {
     if ($student_id <= 0 || empty($severity) || empty($incident_date) || empty($description)) {
         $error_msg = "Please fill in all fields.";
     } else {
+        // 1. Insert Incident
         $stmt = $conn->prepare("INSERT INTO discipline (student_id, teacher_id, severity, incident_date, description) VALUES (?, ?, ?, ?, ?)");
         $stmt->bind_param("iisss", $student_id, $staff_id, $severity, $incident_date, $description);
         
         if ($stmt->execute()) {
             $success_msg = "Incident logged successfully!";
+            
+            // 2. Fetch Student Name for the notification message
+            $st_lookup = $conn->prepare("SELECT full_name, adm_no FROM students WHERE student_id = ? LIMIT 1");
+            $st_lookup->bind_param("i", $student_id);
+            $st_lookup->execute();
+            $st_data = $st_lookup->get_result()->fetch_assoc();
+            $st_lookup->close();
+            
+            $student_name = $st_data['full_name'] ?? 'A student';
+            $adm_no = $st_data['adm_no'] ?? '';
+
+            // 3. Send Notification to Admin
+            // We insert into the messages table with recipient_email as NULL/empty so it goes to the admin inbox
+            $msg_subject = "New Discipline Incident Logged";
+            $msg_content = "A $severity incident was logged for $student_name ($adm_no) by $staff_name. Date of incident: " . date('d M Y', strtotime($incident_date)) . ".";
+            
+            $msg_stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, 0)");
+            $msg_stmt->bind_param("ssss", $staff_name, $staff_email, $msg_subject, $msg_content);
+            $msg_stmt->execute();
+            $msg_stmt->close();
+            
         } else {
             $error_msg = "Error logging incident: " . $stmt->error;
         }
@@ -94,7 +118,6 @@ $extra_label = 'Discipline Management';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* Shared styles from your sample */
         :root {
             --primary: #000a66;
             --primary-soft: #1a2590;
@@ -239,7 +262,7 @@ $extra_label = 'Discipline Management';
                             $severity_class = 'incident-' . strtolower($row['severity']);
                             $badge_class = match(strtolower($row['severity'])) {
                                 'minor' => 'bg-warning text-dark',
-                                'major' => 'bg-orange text-white', // Note: bg-orange is custom in bootstrap 5
+                                'major' => 'bg-orange text-white',
                                 'severe' => 'bg-danger text-white',
                                 default => 'bg-secondary text-white'
                             };

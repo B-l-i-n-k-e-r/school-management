@@ -14,7 +14,6 @@ $adm_no = $_SESSION['adm_no'];
 $message = '';
 $message_type = '';
 
-// Fetch student
 $stmt = $conn->prepare("SELECT student_id, adm_no, full_name, form FROM students WHERE adm_no = ? LIMIT 1");
 $stmt->bind_param("s", $adm_no);
 $stmt->execute();
@@ -25,7 +24,6 @@ if (!$student) die("Student record not found.");
 
 $student_id = (int) $student['student_id'];
 
-// Handle submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_leave'])) {
     $leave_type = trim($_POST['leave_type'] ?? '');
     $start_date = trim($_POST['start_date'] ?? '');
@@ -39,11 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_leave'])) {
         $message = 'End date cannot be before the start date.';
         $message_type = 'danger';
     } else {
-        $ins = $conn->prepare("
-            INSERT INTO academic_leaves
-            (student_id, leave_type, start_date, end_date, reason, status, created_at)
-            VALUES (?, ?, ?, ?, ?, 'Pending', NOW())
-        ");
+        $ins = $conn->prepare("INSERT INTO academic_leaves (student_id, leave_type, start_date, end_date, reason, status, created_at) VALUES (?, ?, ?, ?, ?, 'Pending', NOW())");
         $ins->bind_param("issss", $student_id, $leave_type, $start_date, $end_date, $reason);
         if ($ins->execute()) {
             $message = 'Application submitted successfully. Awaiting approval.';
@@ -56,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_leave'])) {
     }
 }
 
-// Fetch history
 $leave_history = [];
 $h_stmt = $conn->prepare("SELECT * FROM academic_leaves WHERE student_id = ? ORDER BY created_at DESC");
 $h_stmt->bind_param("i", $student_id);
@@ -78,63 +71,49 @@ $extra_label = 'Academic Leave';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { 
-            --sidebar-bg: #34445c; 
-            --submenu-bg: #2c3a4d; 
-            --primary-blue: #1a3066; 
-            --sidebar-width: 240px; 
-        }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        /* Sidebar */
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        /* --- MODERN UI STYLES --- */
-        .card { border: none; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
-        
-        .form-label { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-        .form-control, .form-select { border-radius: 12px; padding: 12px 16px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
-        .form-control:focus, .form-select:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
-        
-        .btn-primary { background: var(--primary-blue); border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; transition: 0.3s; }
-        .btn-primary:hover { background: #0f1f3d; transform: translateY(-2px); }
-
-        /* Modern Status Pills */
-        .status-badge { font-size: 0.75rem; padding: 6px 14px; border-radius: 50px; font-weight: 800; letter-spacing: 0.03em; display: inline-block; }
-        .status-pending  { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
-        .status-approved { background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; }
-        .status-rejected { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
-
-        /* Table Styling */
-        .table th { font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; font-weight: 800; padding: 15px; border-bottom: 2px solid #e2e8f0; }
-        .table td { padding: 15px; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
-        .table tbody tr:hover { background-color: #f8fafc; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-            .main-content { padding: 20px; }
-        }
+        :root { --primary: #000a66; --primary-soft: #1a2590; --primary-tint: #eef0ff; --accent: #facc15; --accent-tint: #fff6cc; --accent-deep: #8a6a00; --bg-light: #f6f7fb; --white: #ffffff; --ink: #14183a; --text-muted: #5b6280; --line: #e3e6f2; --radius-lg: 24px; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .panel.is-flush { padding: 0; overflow: hidden; }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
+        .ui-alert.is-warning { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-field label { display: block; margin-bottom: 8px; font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: all 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
+        .ui-panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 24px 28px; border-bottom: 1px solid var(--line); }
+        .ui-panel-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .ui-panel-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; color: var(--primary); }
+        .ui-count { padding: 5px 14px; border-radius: 99px; background: var(--accent); color: var(--primary); font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+        .ui-table-wrap { overflow-x: auto; }
+        .ui-table { width: 100%; border-collapse: collapse; }
+        .ui-table th { padding: 14px 18px; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); background: var(--bg-light); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ui-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 0.92rem; font-weight: 500; color: var(--text-muted); vertical-align: middle; }
+        .ui-table th:first-child, .ui-table td:first-child { padding-left: 28px; }
+        .ui-table th:last-child,  .ui-table td:last-child  { padding-right: 28px; }
+        .ui-table tbody tr:last-child td { border-bottom: none; }
+        .ui-table tbody tr:hover { background: var(--primary-tint); }
+        .ui-table .is-center { text-align: center; }
+        .ui-name { display: block; color: var(--ink); font-weight: 700; font-size: 0.95rem; }
+        .ui-badge { display: inline-flex; padding: 5px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        .ui-badge.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-badge.is-warning { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-badge.is-danger { background: #fdeaea; color: #a42525; }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -144,28 +123,27 @@ $extra_label = 'Academic Leave';
 
 <main class="main-content">
 
-    <div class="mb-4">
-        <h2 class="fw-bold mb-1 text-dark">Academic Leave</h2>
-        <p class="text-muted small mb-0">Request a formal temporary suspension of studies</p>
+    <div class="ui-head">
+        <div>
+            <h1>Academic Leave</h1>
+            <p>Request a formal temporary suspension of studies</p>
+        </div>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center mb-4">
-            <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'info-circle-fill'; ?> me-2 fs-5"></i>
-            <span class="fw-medium"><?php echo htmlspecialchars($message); ?></span>
-        </div>
+        <div class="ui-alert is-<?php echo $message_type; ?>"><i class="bi bi-info-circle-fill"></i><div><?php echo htmlspecialchars($message); ?></div></div>
     <?php endif; ?>
 
     <div class="row g-4">
         <!-- Application Form -->
         <div class="col-lg-5">
-            <div class="card p-4 p-md-5 h-100 bg-white">
-                <h5 class="fw-bold mb-4 text-dark"><i class="bi bi-pencil-square me-2 text-primary"></i>New Request</h5>
+            <div class="panel h-100">
+                <h5 class="fw-bold mb-4" style="color: var(--primary);"><i class="bi bi-pencil-square me-2"></i>New Request</h5>
                 
                 <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Reason for Leave</label>
-                        <select name="leave_type" class="form-select" required>
+                    <div class="ui-field mb-3">
+                        <label>Reason for Leave</label>
+                        <select name="leave_type" class="ui-input form-select" required>
                             <option value="" disabled selected>Select a category...</option>
                             <option value="Medical">Medical Grounds</option>
                             <option value="Financial">Financial Constraints</option>
@@ -175,78 +153,69 @@ $extra_label = 'Academic Leave';
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Start Date</label>
-                            <input type="date" name="start_date" class="form-control" required>
+                        <div class="col-6 ui-field">
+                            <label>Start Date</label>
+                            <input type="date" name="start_date" class="ui-input" required>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label">End Date</label>
-                            <input type="date" name="end_date" class="form-control" required>
+                        <div class="col-6 ui-field">
+                            <label>End Date</label>
+                            <input type="date" name="end_date" class="ui-input" required>
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label">Detailed Explanation</label>
-                        <textarea name="reason" class="form-control" rows="4" placeholder="Briefly explain your situation..." required></textarea>
+                    <div class="ui-field mb-4">
+                        <label>Detailed Explanation</label>
+                        <textarea name="reason" class="ui-input" rows="4" placeholder="Briefly explain your situation..." required></textarea>
                     </div>
 
-                    <button type="submit" name="apply_leave" class="btn btn-primary w-100 shadow-sm">
-                        <i class="bi bi-send-fill me-2"></i>Submit Application
-                    </button>
+                    <button type="submit" name="apply_leave" class="ui-btn is-primary w-100"><i class="bi bi-send-fill"></i> Submit Application</button>
                 </form>
             </div>
         </div>
 
         <!-- History -->
         <div class="col-lg-7">
-            <div class="card p-4 p-md-5 h-100 bg-white">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history me-2 text-primary"></i>Application History</h5>
-                    <span class="badge rounded-pill bg-light text-secondary border px-3 py-2">
-                        <?php echo count($leave_history); ?> Request<?php echo count($leave_history) === 1 ? '' : 's'; ?>
-                    </span>
+            <div class="panel is-flush h-100">
+                <div class="ui-panel-head">
+                    <div class="ui-panel-title">
+                        <h2>Application History</h2>
+                        <span class="ui-count"><?php echo count($leave_history); ?> Requests</span>
+                    </div>
                 </div>
 
                 <?php if (empty($leave_history)): ?>
-                    <div class="text-center py-5">
-                        <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
-                            <i class="bi bi-calendar-x fs-1 text-muted"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark">No requests found</h6>
-                        <p class="text-muted small mb-0">You haven't submitted any leave requests yet.</p>
+                    <div class="ui-empty">
+                        <i class="bi bi-calendar-x"></i>
+                        <p>No requests found</p>
+                        <small>You haven't submitted any leave requests yet.</small>
                     </div>
                 <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table align-middle mb-0">
-                            <thead class="bg-light">
+                    <div class="ui-table-wrap">
+                        <table class="ui-table">
+                            <thead>
                                 <tr>
                                     <th>Type</th>
                                     <th>Duration</th>
-                                    <th>Status</th>
+                                    <th class="is-center">Status</th>
                                     <th>Submitted</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($leave_history as $leave): ?>
+                                <?php foreach ($leave_history as $leave): 
+                                    $status = strtolower($leave['status'] ?? 'pending');
+                                    $badge = $status === 'approved' ? 'is-success' : ($status === 'rejected' ? 'is-danger' : 'is-warning');
+                                ?>
                                     <tr>
-                                        <td class="fw-bold text-dark"><?php echo htmlspecialchars($leave['leave_type'] ?? ''); ?></td>
+                                        <td><span class="ui-name"><?php echo htmlspecialchars($leave['leave_type'] ?? ''); ?></span></td>
                                         <td>
-                                            <small class="text-muted d-block fw-medium">
-                                                <i class="bi bi-calendar-event me-1"></i> <?php echo !empty($leave['start_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['start_date']))) : '—'; ?>
-                                            </small>
-                                            <small class="text-muted d-block fw-medium mt-1">
-                                                <i class="bi bi-calendar-check me-1"></i> <?php echo !empty($leave['end_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['end_date']))) : '—'; ?>
-                                            </small>
+                                            <small class="text-muted d-block fw-medium"><i class="bi bi-calendar-event me-1"></i> <?php echo !empty($leave['start_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['start_date']))) : '—'; ?></small>
+                                            <small class="text-muted d-block fw-medium mt-1"><i class="bi bi-calendar-check me-1"></i> <?php echo !empty($leave['end_date']) ? htmlspecialchars(date('d M Y', strtotime($leave['end_date']))) : '—'; ?></small>
                                         </td>
-                                        <td>
-                                            <span class="status-badge status-<?php echo strtolower($leave['status'] ?? 'pending'); ?>">
-                                                <?php echo htmlspecialchars($leave['status'] ?? 'Pending'); ?>
-                                            </span>
+                                        <td class="is-center">
+                                            <span class="ui-badge <?php echo $badge; ?>"><?php echo htmlspecialchars($leave['status'] ?? 'Pending'); ?></span>
                                         </td>
-                                        <td>
-                                            <small class="text-muted fw-medium">
-                                                <?php echo !empty($leave['created_at']) ? htmlspecialchars(date('d M Y', strtotime($leave['created_at']))) : '—'; ?>
-                                            </small>
+                                        <td class="text-muted small fw-medium">
+                                            <?php echo !empty($leave['created_at']) ? htmlspecialchars(date('d M Y', strtotime($leave['created_at']))) : '—'; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -262,27 +231,6 @@ $extra_label = 'Academic Leave';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();

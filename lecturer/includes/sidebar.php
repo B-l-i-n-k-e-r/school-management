@@ -7,7 +7,7 @@ $active_page = $active_page ?? '';
 
 $attendance_active = in_array($active_page, ['attendance', 'attendance_history']);
 $exams_active      = in_array($active_page, ['results', 'grade_sheets']);
-$students_active   = in_array($active_page, ['my_classes', 'assignments', 'discipline']);
+$students_active   = in_array($active_page, ['my_classes', 'assignments', 'assignment_submissions', 'discipline']);
 ?>
 <style>
     /* ---------- Shared layout tokens & reset ---------- */
@@ -239,6 +239,7 @@ $students_active   = in_array($active_page, ['my_classes', 'assignments', 'disci
         <ul class="submenu" style="<?php echo $students_active ? 'display:block;' : ''; ?>">
             <li><a href="my_classes.php" <?php echo $active_page === 'my_classes' ? 'class="is-current"' : ''; ?>>My Classes</a></li>
             <li><a href="assignments.php" <?php echo $active_page === 'assignments' ? 'class="is-current"' : ''; ?>>Assignments</a></li>
+            <li><a href="assignment_submissions.php" <?php echo $active_page === 'assignment_submissions' ? 'class="is-current"' : ''; ?>>View Submissions</a></li>
             <li><a href="discipline.php" <?php echo $active_page === 'discipline' ? 'class="is-current"' : ''; ?>>Discipline</a></li>
         </ul>
     </div>

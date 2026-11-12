@@ -21,14 +21,36 @@ $staff_display_name    = $staff_data['full_name']        ?? 'Staff';
 $assigned_form         = $staff_data['assigned_form']    ?? '';
 $assigned_subject_name = $staff_data['assigned_subject'] ?? '';
 
-$form_filter    = $_GET['form']    ?? $assigned_form;
-$subject_filter = $_GET['subject'] ?? $assigned_subject_name;
+// --- Fetch ONLY the pairs this teacher is assigned to ---
+$teacher_assignments = [];
+$assign_query = $conn->query("
+    SELECT ta.class_name, ta.subject_id, s.subject_name 
+    FROM teacher_assignments ta 
+    JOIN subjects s ON ta.subject_id = s.subject_id 
+    WHERE ta.teacher_id = $staff_id
+    ORDER BY ta.class_name ASC, s.subject_name ASC
+");
+if ($assign_query) {
+    while ($row = $assign_query->fetch_assoc()) {
+        $teacher_assignments[] = $row;
+    }
+}
 
-$forms_result = mysqli_query($conn, "SELECT name FROM classes ORDER BY sort_order");
-$subjects_result = mysqli_query($conn, "SELECT subject_name FROM subjects ORDER BY subject_name ASC");
-$subjects_list = [];
-while ($s = mysqli_fetch_assoc($subjects_result)) $subjects_list[] = $s['subject_name'];
+// Extract unique classes and subjects for the dropdowns
+$assigned_classes = [];
+$assigned_subjects = [];
+foreach ($teacher_assignments as $ta) {
+    $assigned_classes[$ta['class_name']] = $ta['class_name'];
+    $assigned_subjects[$ta['subject_name']] = $ta['subject_name'];
+}
+$assigned_classes = array_values($assigned_classes);
+$assigned_subjects = array_values($assigned_subjects);
 
+// Filter defaults
+$form_filter    = $_GET['form']    ?? ($assigned_classes[0] ?? '');
+$subject_filter = $_GET['subject'] ?? ($assigned_subjects[0] ?? '');
+
+// Fetch students with existing grades
 $students = [];
 if ($form_filter && $subject_filter) {
     $stmt = $conn->prepare("
@@ -139,6 +161,11 @@ $extra_label = 'Grade Sheets';
         .grade-table th:nth-child(5) { width: 12%; text-align: center; }
         .grade-table th:nth-child(6) { width: 10%; text-align: center; }
         .grade-table th:nth-child(7) { width: 9%; text-align: center; }
+
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -166,19 +193,19 @@ $extra_label = 'Grade Sheets';
                 <label class="form-label small fw-bold text-muted text-uppercase">Academic Level</label>
                 <select name="form" class="ui-input form-select" required>
                     <option value="">Choose Form...</option>
-                    <?php while ($f = mysqli_fetch_assoc($forms_result)): ?>
-                        <option value="<?php echo htmlspecialchars($f['name']); ?>"
-                            <?php echo ($form_filter == $f['name']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($f['name']); ?>
+                    <?php foreach ($assigned_classes as $cname): ?>
+                        <option value="<?php echo htmlspecialchars($cname); ?>"
+                            <?php echo ($form_filter == $cname) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($cname); ?>
                         </option>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-md-5">
                 <label class="form-label small fw-bold text-muted text-uppercase">Subject</label>
                 <select name="subject" class="ui-input form-select" required>
                     <option value="">Choose Subject...</option>
-                    <?php foreach ($subjects_list as $subj): ?>
+                    <?php foreach ($assigned_subjects as $subj): ?>
                         <option value="<?php echo htmlspecialchars($subj); ?>"
                             <?php echo ($subject_filter == $subj) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($subj); ?>
@@ -194,7 +221,15 @@ $extra_label = 'Grade Sheets';
         </form>
     </div>
 
-    <?php if ($form_filter && $subject_filter && !empty($students)): ?>
+    <?php if (empty($assigned_classes)): ?>
+        <div class="panel">
+            <div class="ui-empty">
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <p>No classes assigned</p>
+                <small>You need to be assigned to a class and subject by the Admin to view grades.</small>
+            </div>
+        </div>
+    <?php elseif ($form_filter && $subject_filter && !empty($students)): ?>
     <form action="save_grades.php" method="POST">
         <input type="hidden" name="form" value="<?php echo htmlspecialchars($form_filter); ?>">
         <input type="hidden" name="subject_name" value="<?php echo htmlspecialchars($subject_filter); ?>">

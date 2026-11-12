@@ -1,57 +1,156 @@
 <?php
 /**
  * Shared Student Topbar
- * Expected variables before include:
- *   $student_display_name — string
- *   $extra_label — string (optional)
  */
 $student_display_name = $student_display_name ?? 'Student';
 $extra_label          = $extra_label          ?? '';
 ?>
+<style>
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        margin-left: var(--sidebar-width, 268px);
+        height: 72px;
+        padding: 0 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line, #e3e6f2);
+        transition: margin-left 0.3s ease;
+    }
+    @media (max-width: 992px) {
+        .topbar { padding: 0 20px; margin-left: 0 !important; }
+    }
+
+    .topbar-burger {
+        width: 44px; height: 44px; display: grid; place-items: center;
+        border: 1px solid var(--line, #e3e6f2); border-radius: 12px;
+        background: var(--white, #fff); color: var(--primary, #000a66);
+        font-size: 1.5rem; line-height: 1; cursor: pointer; transition: background 0.2s;
+    }
+    .topbar-burger:hover { background: var(--primary-tint, #eef0ff); }
+
+    .topbar-title {
+        margin-left: 16px; font-size: 1.05rem; font-weight: 800;
+        letter-spacing: -0.01em; color: var(--primary, #000a66);
+    }
+
+    .topbar .user-dropdown {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 18px; border: none; border-radius: 99px;
+        background: var(--primary, #000a66); color: var(--white, #fff);
+        font-family: inherit; font-size: 0.8rem; font-weight: 700;
+        letter-spacing: 0.02em; transition: background 0.2s;
+    }
+    .topbar .user-dropdown:hover,
+    .topbar .user-dropdown:focus,
+    .topbar .user-dropdown.show {
+        background: var(--primary-soft, #1a2590); color: var(--white, #fff);
+    }
+    .topbar .user-dropdown i { color: var(--accent, #facc15); font-size: 1.05rem; }
+
+    .topbar .dropdown-menu {
+        min-width: 230px; margin-top: 10px !important; padding: 8px;
+        border: 1px solid var(--line, #e3e6f2); border-radius: 18px;
+        box-shadow: 0 24px 40px -16px rgba(0, 10, 102, 0.3);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .topbar-user {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 10px 12px; margin-bottom: 6px;
+        border-bottom: 1px solid var(--line, #e3e6f2);
+    }
+    .topbar-avatar {
+        flex-shrink: 0; width: 40px; height: 40px;
+        display: grid; place-items: center; border-radius: 50%;
+        background: var(--primary, #000a66); color: var(--accent, #facc15);
+        font-size: 1.1rem;
+    }
+    .topbar-user strong {
+        display: block; max-width: 150px; font-size: 0.9rem; font-weight: 800;
+        color: var(--ink, #14183a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .topbar-user span { font-size: 0.76rem; font-weight: 600; color: var(--text-muted, #5b6280); }
+    .topbar .dropdown-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px; border-radius: 10px;
+        font-size: 0.9rem; font-weight: 600; color: var(--ink, #14183a);
+    }
+    .topbar .dropdown-item i { color: var(--primary, #000a66); }
+    .topbar .dropdown-item:hover { background: var(--primary-tint, #eef0ff); color: var(--ink, #14183a); }
+    .topbar .dropdown-item.is-danger, .topbar .dropdown-item.is-danger i { color: #b42318; }
+    .topbar .dropdown-item.is-danger:hover { background: #fdeaea; }
+    .topbar .dropdown-divider { margin: 6px 4px; border-color: var(--line, #e3e6f2); }
+</style>
+
 <div class="topbar">
     <div class="d-flex align-items-center">
-        <i class="bi bi-list fs-4" id="sidebarToggle" style="cursor:pointer;"></i>
+        <button type="button" class="topbar-burger" id="hamburger" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
         <?php if ($extra_label): ?>
-            <span class="fw-bold ms-3 d-none d-md-inline" style="color: #3182ce;"><?php echo htmlspecialchars($extra_label); ?></span>
+            <span class="topbar-title d-none d-md-inline"><?php echo htmlspecialchars($extra_label); ?></span>
         <?php endif; ?>
     </div>
 
     <div class="dropdown">
-        <button class="user-dropdown dropdown-toggle text-uppercase" type="button" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle me-1"></i>
+        <button class="user-dropdown dropdown-toggle text-uppercase" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle"></i>
             <?php echo htmlspecialchars($student_display_name); ?>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm rounded-3 mt-2" style="min-width: 220px;">
-            <li class="px-3 pt-3 pb-2 border-bottom">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
-                         style="width:36px;height:36px;">
-                        <i class="bi bi-person-fill text-primary"></i>
-                    </div>
-                    <div class="lh-sm">
-                        <div class="fw-bold small text-truncate" style="max-width:150px;">
-                            <?php echo htmlspecialchars($student_display_name); ?>
-                        </div>
-                        <div class="text-muted" style="font-size:0.7rem;">Signed in</div>
-                    </div>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li class="topbar-user">
+                <div class="topbar-avatar"><i class="bi bi-person-fill"></i></div>
+                <div>
+                    <strong><?php echo htmlspecialchars($student_display_name); ?></strong>
+                    <span>Student</span>
                 </div>
             </li>
             <li>
-                <a class="dropdown-item py-2 small" href="profile.php">
-                    <i class="bi bi-person me-2 text-primary"></i> My Profile
+                <a class="dropdown-item" href="profile.php">
+                    <i class="bi bi-person-circle"></i> My Profile
                 </a>
             </li>
             <li>
-                <a class="dropdown-item py-2 small" href="reset_password.php">
-                    <i class="bi bi-key me-2 text-primary"></i> Change Password
+                <a class="dropdown-item" href="reset_password.php">
+                    <i class="bi bi-key-fill"></i> Change Password
                 </a>
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
-                <a class="dropdown-item py-2 small text-danger" href="../logout.php">
-                    <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+                <a class="dropdown-item is-danger" href="../logout.php">
+                    <i class="bi bi-box-arrow-right"></i> Sign out
                 </a>
             </li>
         </ul>
     </div>
 </div>
+
+<script>
+    // Hamburger Toggle
+    document.addEventListener("DOMContentLoaded", function() {
+        const burger = document.getElementById('hamburger');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (burger && sidebar) {
+            burger.addEventListener('click', function() {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
+                } else {
+                    document.body.classList.toggle('sidebar-toggled');
+                }
+            });
+        }
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        }
+    });
+</script>

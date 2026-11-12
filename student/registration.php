@@ -5,7 +5,6 @@ error_reporting(E_ALL);
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 include('../database/db_connect.php');
 
-// Session protection
 if (!isset($_SESSION['adm_no']) || ($_SESSION['role'] ?? '') !== 'student') {
     header("Location: ../login.php");
     exit();
@@ -15,23 +14,19 @@ $adm_no = $_SESSION['adm_no'];
 $message = '';
 $message_type = '';
 
-// Fetch student
 $stmt = $conn->prepare("SELECT student_id, adm_no, full_name, form FROM students WHERE adm_no = ? LIMIT 1");
 $stmt->bind_param("s", $adm_no);
 $stmt->execute();
 $student = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$student) {
-    die("Student record not found.");
-}
+if (!$student) { die("Student record not found."); }
 
 $student_id = (int) $student['student_id'];
 $student_form = $student['form'] ?? '';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_subjects'])) {
-    // Double-check they haven't already registered
     $check_reg = $conn->prepare("SELECT COUNT(*) as c FROM student_subjects WHERE student_id = ?");
     $check_reg->bind_param("i", $student_id);
     $check_reg->execute();
@@ -70,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_subjects']))
     }
 }
 
-// Fetch available subjects ONLY for the student's form
+// Fetch available subjects
 $available_subjects = [];
 $sub_stmt = $conn->prepare("SELECT subject_id, subject_name, form, term FROM subjects WHERE form = ? ORDER BY subject_name ASC");
 $sub_stmt->bind_param("s", $student_form);
@@ -79,7 +74,7 @@ $sub_res = $sub_stmt->get_result();
 while ($row = $sub_res->fetch_assoc()) $available_subjects[] = $row;
 $sub_stmt->close();
 
-// Fetch already registered IDs
+// Fetch registered IDs
 $registered_ids = [];
 $reg_stmt = $conn->prepare("SELECT subject_id FROM student_subjects WHERE student_id = ?");
 $reg_stmt->bind_param("i", $student_id);
@@ -88,7 +83,6 @@ $reg_res = $reg_stmt->get_result();
 while ($row = $reg_res->fetch_assoc()) $registered_ids[] = (int) $row['subject_id'];
 $reg_stmt->close();
 
-// Check if the student has completed registration
 $is_locked = count($registered_ids) > 0;
 
 $student_display_name = $student['full_name'] ?? 'Student';
@@ -104,44 +98,49 @@ $extra_label = 'Subject Registration';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .subject-row:hover { background-color: #f8fafc; }
-        .form-check-input:checked { background-color: #1a3066; border-color: #1a3066; }
-        .form-check-input { cursor: pointer; }
-
-        /* Locked State Styling */
-        .locked-banner { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 12px; padding: 15px 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .locked-banner i { font-size: 1.5rem; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-        }
+        :root { --primary: #000a66; --primary-soft: #1a2590; --primary-tint: #eef0ff; --accent: #facc15; --accent-tint: #fff6cc; --accent-deep: #8a6a00; --bg-light: #f6f7fb; --white: #ffffff; --ink: #14183a; --text-muted: #5b6280; --line: #e3e6f2; --radius-lg: 24px; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .panel.is-flush { padding: 0; overflow: hidden; }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
+        .ui-alert.is-warning { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-alert.is-info    { background: var(--primary-tint); color: var(--primary); }
+        .ui-panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 24px 28px; border-bottom: 1px solid var(--line); }
+        .ui-panel-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .ui-panel-title h2 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; color: var(--primary); }
+        .ui-count { padding: 5px 14px; border-radius: 99px; background: var(--accent); color: var(--primary); font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+        .ui-table-wrap { overflow-x: auto; }
+        .ui-table { width: 100%; border-collapse: collapse; }
+        .ui-table th { padding: 14px 18px; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); background: var(--bg-light); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; }
+        .ui-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 0.92rem; font-weight: 500; color: var(--text-muted); vertical-align: middle; }
+        .ui-table th:first-child, .ui-table td:first-child { padding-left: 28px; }
+        .ui-table th:last-child,  .ui-table td:last-child  { padding-right: 28px; }
+        .ui-table tbody tr:last-child td { border-bottom: none; }
+        .ui-table tbody tr:hover { background: var(--primary-tint); }
+        .ui-table .is-center { text-align: center; }
+        .ui-name { display: block; color: var(--ink); font-weight: 700; font-size: 0.95rem; }
+        .ui-badge { display: inline-flex; padding: 5px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        .ui-badge.is-navy { background: var(--primary-tint); color: var(--primary); }
+        .ui-badge.is-gold { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-badge.is-success { background: #e7f7ee; color: #14633a; }
+        .form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+        .form-check-input { cursor: pointer; width: 1.2em; height: 1.2em; }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -150,98 +149,78 @@ $extra_label = 'Subject Registration';
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-
-    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1">Subject Registration</h2>
-            <p class="text-muted small mb-0">
-                <?php echo $is_locked ? 'Your registered subjects for this semester' : 'Select the subjects you\'ll take this semester'; ?>
-            </p>
+            <h1>Subject Registration</h1>
+            <p><?php echo $is_locked ? 'Your registered subjects for this semester' : 'Select the subjects you\'ll take this semester'; ?></p>
         </div>
-        <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-2 fw-bold">
-            <?php echo htmlspecialchars($student_display_name); ?>
-            <?php if (!empty($student['form'])): ?>
-                &middot; <?php echo htmlspecialchars($student['form']); ?>
-            <?php endif; ?>
-        </span>
+        <span class="ui-badge is-navy fs-6 px-3 py-2"><i class="bi bi-person-badge me-1"></i> <?php echo htmlspecialchars($student_display_name); ?> (<?php echo htmlspecialchars($student_form); ?>)</span>
     </div>
 
     <?php if ($message): ?>
-        <div class="alert alert-<?php echo $message_type; ?> border-0 shadow-sm rounded-4 d-flex align-items-center">
-            <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle-fill' : 'info-circle-fill'; ?> me-2"></i>
-            <?php echo htmlspecialchars($message); ?>
-        </div>
+        <div class="ui-alert is-<?php echo $message_type; ?>"><i class="bi bi-info-circle-fill"></i><div><?php echo htmlspecialchars($message); ?></div></div>
     <?php endif; ?>
 
     <?php if ($is_locked): ?>
-        <div class="locked-banner">
+        <div class="ui-alert is-info">
             <i class="bi bi-lock-fill"></i>
-            <div>
-                <strong>Registration Complete</strong><br>
-                <span class="small">Your subjects have been locked. Please contact the administration if you need to make changes.</span>
-            </div>
+            <div><strong>Registration Complete.</strong> Your subjects have been locked. Please contact the administration if you need to make changes.</div>
         </div>
     <?php endif; ?>
 
-    <div class="card p-4">
+    <div class="panel is-flush">
+        <div class="ui-panel-head">
+            <div class="ui-panel-title">
+                <h2>Available Subjects</h2>
+                <span class="ui-count"><?php echo count($available_subjects); ?> Subjects</span>
+            </div>
+        </div>
+
         <?php if (empty($available_subjects)): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-journal-x fs-1 text-muted d-block mb-3"></i>
-                <h5 class="fw-bold text-muted">No subjects available</h5>
-                <p class="text-muted mb-0">There are no subjects published for <strong><?php echo htmlspecialchars($student_form); ?></strong> yet.</p>
+            <div class="ui-empty">
+                <i class="bi bi-journal-x"></i>
+                <p>No subjects available</p>
+                <small>There are no subjects published for <?php echo htmlspecialchars($student_form); ?> yet.</small>
             </div>
         <?php else: ?>
             <form method="POST">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="bg-light">
-                            <tr class="small text-muted fw-bold text-uppercase">
-                                <?php if (!$is_locked): ?>
-                                    <th style="width: 60px;" class="text-center">Select</th>
-                                <?php endif; ?>
+                <div class="ui-table-wrap">
+                    <table class="ui-table">
+                        <thead>
+                            <tr>
+                                <?php if (!$is_locked): ?><th class="is-center" style="width: 80px;">Select</th><?php endif; ?>
                                 <th>Subject</th>
                                 <th>Form</th>
                                 <th>Term</th>
-                                <th class="text-center">Status</th>
+                                <th class="is-center">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($available_subjects as $sub):
                                 $sid = (int) $sub['subject_id'];
                                 $is_registered = in_array($sid, $registered_ids);
-                                
-                                // If locked, only show the subjects they actually registered
                                 if ($is_locked && !$is_registered) continue;
                             ?>
-                                <tr class="subject-row">
+                                <tr>
                                     <?php if (!$is_locked): ?>
-                                        <td class="text-center">
-                                            <input class="form-check-input" type="checkbox"
-                                                   name="subjects[]"
-                                                   value="<?php echo $sid; ?>"
-                                                   id="sub_<?php echo $sid; ?>">
+                                        <td class="is-center">
+                                            <input class="form-check-input" type="checkbox" name="subjects[]" value="<?php echo $sid; ?>" id="sub_<?php echo $sid; ?>">
                                         </td>
                                     <?php endif; ?>
                                     <td>
                                         <?php if (!$is_locked): ?>
-                                            <label for="sub_<?php echo $sid; ?>" class="fw-bold mb-0" style="cursor:pointer;">
-                                                <?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?>
-                                            </label>
+                                            <label for="sub_<?php echo $sid; ?>" class="ui-name" style="cursor:pointer;"><?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?></label>
                                         <?php else: ?>
-                                            <span class="fw-bold mb-0 text-dark">
-                                                <i class="bi bi-book text-primary me-2"></i><?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?>
-                                            </span>
+                                            <span class="ui-name"><i class="bi bi-book text-primary me-2"></i><?php echo htmlspecialchars($sub['subject_name'] ?? ''); ?></span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="text-muted"><?php echo htmlspecialchars($sub['form'] ?? '—'); ?></td>
-                                    <td class="text-muted"><?php echo htmlspecialchars($sub['term'] ?? '—'); ?></td>
-                                    <td class="text-center">
+                                    <td><?php echo htmlspecialchars($sub['form'] ?? '—'); ?></td>
+                                    <td><?php echo htmlspecialchars($sub['term'] ?? '—'); ?></td>
+                                    <td class="is-center">
                                         <?php if ($is_registered): ?>
-                                            <span class="badge rounded-pill bg-success-subtle text-success px-3 py-2">
-                                                <i class="bi bi-check2 me-1"></i>Registered
-                                            </span>
+                                            <span class="ui-badge is-success"><i class="bi bi-check2 me-1"></i>Registered</span>
                                         <?php else: ?>
-                                            <span class="badge rounded-pill bg-light text-muted px-3 py-2">Not registered</span>
+                                            <span class="ui-badge is-navy">Not registered</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -251,45 +230,18 @@ $extra_label = 'Subject Registration';
                 </div>
 
                 <?php if (!$is_locked): ?>
-                    <div class="mt-4 d-flex justify-content-end gap-2 flex-wrap">
-                        <button type="reset" class="btn btn-light border rounded-3 px-4">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
-                        </button>
-                        <button type="submit" name="register_subjects"
-                                class="btn btn-primary rounded-3 px-4 fw-bold">
-                            <i class="bi bi-check2-circle me-2"></i>Confirm Registration
-                        </button>
+                    <div class="p-4 d-flex justify-content-end gap-2 flex-wrap border-top">
+                        <button type="reset" class="ui-btn is-ghost border border-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+                        <button type="submit" name="register_subjects" class="ui-btn is-primary"><i class="bi bi-check2-circle"></i> Confirm Registration</button>
                     </div>
                 <?php endif; ?>
             </form>
         <?php endif; ?>
     </div>
-
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();

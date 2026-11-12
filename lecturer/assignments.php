@@ -12,42 +12,92 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
 }
 
 $staff_id = (int) $_SESSION['user_id'];
-$staff_query = $conn->query("SELECT full_name, assigned_form, assigned_subject FROM teachers WHERE teacher_id = $staff_id");
+$staff_query = $conn->query("SELECT full_name, email FROM teachers WHERE teacher_id = $staff_id");
 $staff_data = $staff_query->fetch_assoc() ?: [];
+$staff_name = $staff_data['full_name'] ?? 'Staff';
+$staff_email = $staff_data['email'] ?? '';
 
-$assigned_form         = $staff_data['assigned_form']    ?? '';
-$assigned_subject_name = $staff_data['assigned_subject'] ?? '';
-
-// Look up subject_id
-$subject_id = 0;
-if ($assigned_subject_name) {
-    $sub_lookup = $conn->prepare("SELECT subject_id FROM subjects WHERE subject_name = ? LIMIT 1");
-    $sub_lookup->bind_param("s", $assigned_subject_name);
-    $sub_lookup->execute();
-    $sub_res = $sub_lookup->get_result()->fetch_assoc();
-    $subject_id = (int) ($sub_res['subject_id'] ?? 0);
-    $sub_lookup->close();
+// --- Fetch ONLY the pairs this teacher is assigned to ---
+$teacher_assignments = [];
+$assign_query = $conn->query("
+    SELECT ta.class_name, ta.subject_id, s.subject_name 
+    FROM teacher_assignments ta 
+    JOIN subjects s ON ta.subject_id = s.subject_id 
+    WHERE ta.teacher_id = $staff_id
+");
+if ($assign_query) {
+    while ($row = $assign_query->fetch_assoc()) {
+        $teacher_assignments[] = $row;
+    }
 }
 
 $success_msg = '';
 $error_msg   = '';
 
-// Handle new assignment submission
+// Handle new submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_assignment'])) {
     $title       = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $due_date    = trim($_POST['due_date'] ?? '');
+    $type        = trim($_POST['assignment_type'] ?? 'Assignment');
+    
+    // These come from the single dropdown selector
+    $selected_pair = $_POST['selected_pair'] ?? '';
+    $pair_parts    = explode('|', $selected_pair);
+    $class_name    = $pair_parts[0] ?? '';
+    $subject_id    = (int) ($pair_parts[1] ?? 0);
 
-    if (empty($title) || empty($description) || empty($due_date)) {
-        $error_msg = "Please fill in all fields.";
-    } else {
-        $stmt = $conn->prepare("INSERT INTO assignments (teacher_id, subject_id, class_name, title, description, due_date) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("iissss", $staff_id, $subject_id, $assigned_form, $title, $description, $due_date);
+    $file_path = null;
+
+    // Handle File Upload
+    if (isset($_FILES['assignment_file']) && $_FILES['assignment_file']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = '../uploads/assignments/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        
+        $fileName = time() . '_' . basename($_FILES['assignment_file']['name']);
+        $targetPath = $uploadDir . $fileName;
+        
+        if (move_uploaded_file($_FILES['assignment_file']['tmp_name'], $targetPath)) {
+            $file_path = $targetPath;
+        } else {
+            $error_msg = "Failed to upload file.";
+        }
+    }
+
+    if (empty($title) || empty($description) || empty($due_date) || empty($class_name) || $subject_id <= 0) {
+        $error_msg = "Please fill in all required fields and select an assignment target.";
+    } elseif (empty($error_msg)) {
+        // Insert Assignment (CORRECTED bind_param string 'iissssss')
+        $stmt = $conn->prepare("INSERT INTO assignments (teacher_id, subject_id, class_name, title, description, due_date, assignment_type, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("iissssss", $staff_id, $subject_id, $class_name, $title, $description, $due_date, $type, $file_path);
         
         if ($stmt->execute()) {
-            $success_msg = "Assignment created successfully!";
+            $success_msg = "$type posted successfully for $class_name!";
+            
+            // --- NOTIFICATION LOGIC ---
+            $st_lookup = $conn->prepare("SELECT email FROM students WHERE form = ? AND email IS NOT NULL AND email != ''");
+            $st_lookup->bind_param("s", $class_name);
+            $st_lookup->execute();
+            $st_res = $st_lookup->get_result();
+            
+            $msg_subject = "New $type: $title";
+            $msg_content = "A new $type has been posted for $class_name. Due date: " . date('d M Y', strtotime($due_date)) . ". Please check your assignments page.";
+            
+            $msg_stmt = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, recipient_email, subject, content, is_read) VALUES ('staff', ?, ?, ?, ?, ?, 0)");
+            
+            $count = 0;
+            while ($st = $st_res->fetch_assoc()) {
+                $recipient_email = $st['email'];
+                $msg_stmt->bind_param("sssss", $staff_name, $staff_email, $recipient_email, $msg_subject, $msg_content);
+                if ($msg_stmt->execute()) $count++;
+            }
+            $msg_stmt->close();
+            $st_lookup->close();
+            
+            if ($count > 0) $success_msg .= " Notifications sent to $count students.";
+            
         } else {
-            $error_msg = "Error creating assignment: " . $stmt->error;
+            $error_msg = "Error creating record: " . $stmt->error;
         }
         $stmt->close();
     }
@@ -56,17 +106,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_assignment']))
 // Handle deletion
 if (isset($_GET['delete_id'])) {
     $del_id = (int)$_GET['delete_id'];
+    
+    // Delete file if exists
+    $f_stmt = $conn->prepare("SELECT file_path FROM assignments WHERE assignment_id = ? AND teacher_id = ?");
+    $f_stmt->bind_param("ii", $del_id, $staff_id);
+    $f_stmt->execute();
+    $f_res = $f_stmt->get_result()->fetch_assoc();
+    if ($f_res && !empty($f_res['file_path']) && file_exists($f_res['file_path'])) {
+        unlink($f_res['file_path']);
+    }
+    $f_stmt->close();
+
     $del_stmt = $conn->prepare("DELETE FROM assignments WHERE assignment_id = ? AND teacher_id = ?");
     $del_stmt->bind_param("ii", $del_id, $staff_id);
     if ($del_stmt->execute()) {
-        $success_msg = "Assignment deleted.";
+        $success_msg = "Record deleted.";
     }
     $del_stmt->close();
 }
 
 // Fetch all assignments by this teacher
 $assignments = [];
-$stmt = $conn->prepare("SELECT * FROM assignments WHERE teacher_id = ? ORDER BY created_at DESC");
+$stmt = $conn->prepare("SELECT a.*, s.subject_name FROM assignments a LEFT JOIN subjects s ON a.subject_id = s.subject_id WHERE a.teacher_id = ? ORDER BY a.created_at DESC");
 $stmt->bind_param("i", $staff_id);
 $stmt->execute();
 $res = $stmt->get_result();
@@ -87,7 +148,6 @@ $extra_label = 'Manage Assignments';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* Shared styles from your sample */
         :root {
             --primary: #000a66;
             --primary-soft: #1a2590;
@@ -129,9 +189,11 @@ $extra_label = 'Manage Assignments';
         .ui-icon { width: 38px; height: 38px; display: inline-grid; place-items: center; border: none; border-radius: 12px; background: var(--white); color: #b42318; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
         .ui-icon:hover { background: #fdeaea; }
 
-        @media (max-width: 992px) {
-            .main-content { padding: 20px; }
-        }
+        .badge { padding: 6px 12px; border-radius: 50px; font-weight: 800; font-size: 0.75rem; }
+        .badge.assignment { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .badge.cat { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -142,8 +204,8 @@ $extra_label = 'Manage Assignments';
 <main class="main-content">
     <div class="ui-head">
         <div>
-            <h1>Class Assignments</h1>
-            <p>Create and manage homework for <strong><?php echo htmlspecialchars($assigned_form ?: 'your class'); ?></strong></p>
+            <h1>Class Assignments & CATs</h1>
+            <p>Create and manage homework and continuous assessment tests.</p>
         </div>
     </div>
 
@@ -156,31 +218,62 @@ $extra_label = 'Manage Assignments';
 
     <div class="row g-4">
         <!-- Create Assignment Form -->
-        <div class="col-lg-4">
+        <div class="col-lg-5">
             <div class="panel h-100">
-                <h5 class="fw-bold mb-4"><i class="bi bi-plus-circle-fill me-2" style="color: var(--primary);"></i>New Assignment</h5>
+                <h5 class="fw-bold mb-4"><i class="bi bi-plus-circle-fill me-2" style="color: var(--primary);"></i>New Upload</h5>
                 
-                <?php if (!$assigned_form): ?>
-                    <div class="ui-alert is-warning m-0"><i class="bi bi-exclamation-triangle-fill"></i><div>You have no assigned class. Contact admin.</div></div>
+                <?php if (empty($teacher_assignments)): ?>
+                    <div class="ui-alert is-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <div>You have no assigned classes or subjects. Please contact the admin to update your profile.</div>
+                    </div>
                 <?php else: ?>
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6 ui-field">
+                                <label>Type</label>
+                                <select name="assignment_type" class="ui-input form-select" required>
+                                    <option value="Assignment">Assignment</option>
+                                    <option value="CAT">CAT (Test)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 ui-field">
+                                <label>Due Date</label>
+                                <input type="date" name="due_date" class="ui-input" required min="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                        </div>
+
                         <div class="ui-field mb-3">
-                            <label>Assignment Title</label>
+                            <label>Target Class & Subject</label>
+                            <select name="selected_pair" class="ui-input form-select" required>
+                                <option value="" disabled selected>-- Choose Target --</option>
+                                <?php foreach ($teacher_assignments as $ta): ?>
+                                    <option value="<?php echo htmlspecialchars($ta['class_name'] . '|' . $ta['subject_id']); ?>">
+                                        <?php echo htmlspecialchars($ta['class_name'] . ' - ' . $ta['subject_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="ui-field mb-3">
+                            <label>Title</label>
                             <input type="text" name="title" class="ui-input" placeholder="e.g., Chapter 4 Exercises" required>
                         </div>
-                        
+
                         <div class="ui-field mb-3">
-                            <label>Due Date</label>
-                            <input type="date" name="due_date" class="ui-input" required min="<?php echo date('Y-m-d'); ?>">
+                            <label>Instructions</label>
+                            <textarea name="description" class="ui-input" rows="3" placeholder="Provide details..." required></textarea>
                         </div>
 
                         <div class="ui-field mb-4">
-                            <label>Instructions</label>
-                            <textarea name="description" class="ui-input" rows="4" placeholder="Provide details about the assignment..." required></textarea>
+                            <label>Attach File (Optional)</label>
+                            <input type="file" name="assignment_file" class="ui-input" style="padding: 9px 12px;">
+                            <small class="text-muted mt-1 d-block">Upload PDF, DOC, or Image.</small>
                         </div>
 
                         <button type="submit" name="create_assignment" class="ui-btn is-primary w-100">
-                            <i class="bi bi-send-fill"></i> Post Assignment
+                            <i class="bi bi-cloud-upload-fill"></i> Post & Notify Students
                         </button>
                     </form>
                 <?php endif; ?>
@@ -188,32 +281,44 @@ $extra_label = 'Manage Assignments';
         </div>
 
         <!-- List of Assignments -->
-        <div class="col-lg-8">
+        <div class="col-lg-7">
             <div class="panel h-100">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-journal-text me-2" style="color: var(--primary);"></i>Posted Assignments</h5>
-                    <span class="ui-badge is-navy"><?php echo count($assignments); ?> Total</span>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-journal-text me-2" style="color: var(--primary);"></i>Recently Posted</h5>
+                    <span class="ui-badge is-navy" style="background: var(--bg-light); color: var(--text-muted); border: 1px solid var(--line);"><?php echo count($assignments); ?> Total</span>
                 </div>
 
                 <?php if (empty($assignments)): ?>
                     <div class="ui-empty">
                         <i class="bi bi-inbox"></i>
-                        <p>No assignments yet</p>
-                        <small>Create your first assignment using the form.</small>
+                        <p>Nothing posted yet</p>
+                        <small>Upload your first assignment or CAT.</small>
                     </div>
                 <?php else: ?>
                     <div class="assignment-list">
-                        <?php foreach ($assignments as $row): ?>
+                        <?php foreach ($assignments as $row): 
+                            $type_badge = strtolower($row['assignment_type'] ?? 'assignment') === 'cat' ? 'cat' : 'assignment';
+                        ?>
                             <div class="assignment-item d-flex justify-content-between align-items-start">
-                                <div>
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge <?php echo $type_badge; ?>"><?php echo htmlspecialchars($row['assignment_type'] ?? 'Assignment'); ?></span>
+                                        <span class="badge" style="background: var(--primary-tint); color: var(--primary); border: none;"><i class="bi bi-bookmark me-1"></i><?php echo htmlspecialchars($row['class_name']); ?></span>
+                                        <span class="badge" style="background: var(--bg-light); color: var(--text-muted); border: 1px solid var(--line);"><?php echo htmlspecialchars($row['subject_name'] ?? '—'); ?></span>
+                                    </div>
                                     <h6 class="fw-bold mb-1" style="color: var(--ink); font-size: 1.05rem;"><?php echo htmlspecialchars($row['title']); ?></h6>
-                                    <p class="text-muted small mb-3"><?php echo nl2br(htmlspecialchars($row['description'])); ?></p>
-                                    <div class="d-flex gap-3 small text-muted fw-bold">
+                                    <p class="text-muted small mb-2"><?php echo nl2br(htmlspecialchars($row['description'])); ?></p>
+                                    
+                                    <div class="d-flex flex-wrap gap-3 small text-muted fw-bold mt-3">
                                         <span><i class="bi bi-calendar-event me-1 text-primary"></i> Due: <?php echo date('d M Y', strtotime($row['due_date'])); ?></span>
-                                        <span><i class="bi bi-clock me-1 text-secondary"></i> Posted: <?php echo date('d M Y', strtotime($row['created_at'])); ?></span>
+                                        <?php if (!empty($row['file_path'])): ?>
+                                            <a href="<?php echo htmlspecialchars($row['file_path']); ?>" download class="text-decoration-none" style="color: var(--accent-deep);">
+                                                <i class="bi bi-paperclip me-1"></i> Download File
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
-                                <a href="?delete_id=<?php echo $row['assignment_id']; ?>" class="ui-icon" onclick="return confirm('Delete this assignment?');">
+                                <a href="?delete_id=<?php echo $row['assignment_id']; ?>" class="ui-icon" onclick="return confirm('Delete this record?');">
                                     <i class="bi bi-trash"></i>
                                 </a>
                             </div>

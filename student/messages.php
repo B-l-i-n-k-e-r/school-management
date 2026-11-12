@@ -5,15 +5,15 @@ error_reporting(E_ALL);
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 include('../database/db_connect.php');
 
-// Session protection
 if (!isset($_SESSION['adm_no']) || ($_SESSION['role'] ?? '') !== 'student') {
     header("Location: ../login.php");
     exit();
 }
 
 $adm_no = $_SESSION['adm_no'];
+$message = '';
+$message_type = '';
 
-// Fetch student
 $stmt = $conn->prepare("SELECT student_id, adm_no, full_name, email, form FROM students WHERE adm_no = ? LIMIT 1");
 $stmt->bind_param("s", $adm_no);
 $stmt->execute();
@@ -24,17 +24,39 @@ if (!$student) die("Student record not found.");
 
 $student_id = (int) $student['student_id'];
 $student_email = $student['email'] ?? '';
+$student_name = $student['full_name'] ?? 'Student';
+
+// Handle Replying to a Teacher
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_reply'])) {
+    $teacher_email = trim($_POST['teacher_email'] ?? '');
+    $subject       = trim($_POST['subject'] ?? '');
+    $content       = trim($_POST['content'] ?? '');
+
+    if (empty($teacher_email) || empty($subject) || empty($content)) {
+        $message = 'All fields are required to send a reply.';
+        $message_type = 'danger';
+    } else {
+        // Insert into messages table
+        $ins = $conn->prepare("INSERT INTO messages (sender_role, sender_name, sender_email, recipient_email, subject, content, is_read) VALUES ('student', ?, ?, ?, ?, ?, 0)");
+        $ins->bind_param("sssss", $student_name, $student_email, $teacher_email, $subject, $content);
+        if ($ins->execute()) {
+            $message = 'Reply sent successfully!';
+            $message_type = 'success';
+        } else {
+            $message = 'Failed to send reply: ' . $conn->error;
+            $message_type = 'danger';
+        }
+        $ins->close();
+    }
+}
 
 // Handle marking a message as read
 if (isset($_GET['mark_read'])) {
     $msg_id = intval($_GET['mark_read']);
-    // Security: Only mark as read if the recipient_email matches this student
     $stmt = $conn->prepare("UPDATE messages SET is_read = 1 WHERE message_id = ? AND recipient_email = ?");
     $stmt->bind_param("is", $msg_id, $student_email);
     $stmt->execute();
     $stmt->close();
-    
-    // Redirect to prevent accidental re-submission on refresh
     header("Location: messages.php");
     exit();
 }
@@ -47,7 +69,7 @@ $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) $announcements[] = $row;
 $stmt->close();
 
-// Fetch Direct Messages (Unread first, then by date)
+// Fetch Direct Messages
 $messages = [];
 $stmt = $conn->prepare("SELECT * FROM messages WHERE recipient_email = ? ORDER BY is_read ASC, created_at DESC");
 $stmt->bind_param("s", $student_email);
@@ -56,11 +78,8 @@ $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) $messages[] = $row;
 $stmt->close();
 
-// Count unread
 $unread_count = 0;
-foreach ($messages as $m) {
-    if (empty($m['is_read'])) $unread_count++;
-}
+foreach ($messages as $m) { if (empty($m['is_read'])) $unread_count++; }
 
 $student_display_name = $student['full_name'] ?? 'Student';
 $active_page = 'messages';
@@ -75,59 +94,49 @@ $extra_label = 'Messages';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        /* Sidebar */
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        /* Modern UI */
-        .modern-card { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.03); padding: 30px; }
+        :root { --primary: #000a66; --primary-soft: #1a2590; --primary-tint: #eef0ff; --accent: #facc15; --accent-tint: #fff6cc; --accent-deep: #8a6a00; --bg-light: #f6f7fb; --white: #ffffff; --ink: #14183a; --text-muted: #5b6280; --line: #e3e6f2; --radius-lg: 24px; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
+        .ui-btn.is-sm { padding: 8px 16px; font-size: 0.82rem; }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
         
-        /* Announcements */
-        .notice-item { border-bottom: 1px solid #e2e8f0; padding: 20px 0; }
+        .ui-field label { display: block; margin-bottom: 8px; font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: all 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
+
+        .modern-card { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        
+        .notice-item { border-bottom: 1px solid var(--line); padding: 20px 0; }
         .notice-item:last-child { border-bottom: none; padding-bottom: 0; }
         .notice-badge { font-size: 0.65rem; padding: 4px 10px; border-radius: 50px; font-weight: 800; text-transform: uppercase; }
         .badge-event { background: #dbeafe; color: #1e40af; }
         .badge-academic { background: #dcfce7; color: #166534; }
         .badge-emergency { background: #fee2e2; color: #991b1b; }
         .badge-general { background: #f1f5f9; color: #475569; }
-
-        /* Direct Messages (Chat Bubbles) */
+        
         .chat-container { display: flex; flex-direction: column; gap: 20px; }
-        .chat-bubble { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; border-top-left-radius: 4px; padding: 20px; position: relative; transition: 0.2s; }
-        
-        /* Unread styling */
-        .chat-bubble.unread { background: #eff6ff; border-color: #bfdbfe; border-left: 4px solid #3b82f6; }
-        
-        .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
+        .chat-bubble { background: var(--bg-light); border: 1px solid var(--line); border-radius: 16px; border-top-left-radius: 4px; padding: 20px; position: relative; transition: 0.2s; }
+        .chat-bubble.unread { background: var(--primary-tint); border-color: var(--primary); border-left: 4px solid var(--primary); }
+        .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
         .teacher-avatar { width: 40px; height: 40px; border-radius: 50%; background: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; }
         
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-            .main-content { padding: 20px; }
-        }
+        .ui-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+        .ui-empty i { display: block; font-size: 2.4rem; margin-bottom: 10px; color: var(--primary); opacity: 0.4; }
+        .ui-empty p { margin: 0; font-weight: 600; }
+        .ui-empty small { display: block; margin-top: 6px; }
+        
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -136,26 +145,30 @@ $extra_label = 'Messages';
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <div class="d-flex justify-content-between align-items-start mb-4">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1 text-dark">Communication Center</h2>
-            <p class="text-muted small mb-0">View announcements and direct messages from your teachers</p>
+            <h1>Communication Center</h1>
+            <p>View announcements and direct messages from your teachers</p>
         </div>
     </div>
+
+    <?php if ($message): ?>
+        <div class="ui-alert is-<?php echo $message_type; ?>"><i class="bi bi-info-circle-fill"></i><div><?php echo htmlspecialchars($message); ?></div></div>
+    <?php endif; ?>
 
     <div class="row g-4">
         <!-- Left Side: Announcements -->
         <div class="col-lg-5">
             <div class="modern-card h-100">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-megaphone-fill me-2 text-warning"></i>School Announcements</h5>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-megaphone-fill me-2" style="color: #f59e0b;"></i>School Announcements</h5>
                 </div>
 
                 <?php if (empty($announcements)): ?>
-                    <div class="text-center py-5">
-                        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                        <h6 class="fw-bold text-muted">No announcements</h6>
-                        <p class="text-muted small mb-0">Admin notices will appear here.</p>
+                    <div class="ui-empty">
+                        <i class="bi bi-inbox"></i>
+                        <p>No announcements</p>
+                        <small>Admin notices will appear here.</small>
                     </div>
                 <?php else: ?>
                     <div class="announcement-list">
@@ -167,7 +180,7 @@ $extra_label = 'Messages';
                                     <span class="notice-badge badge-<?php echo $type; ?>">
                                         <?php echo htmlspecialchars($not['type']); ?>
                                     </span>
-                                    <small class="text-muted" style="font-size: 0.75rem;">
+                                    <small class="text-muted fw-bold" style="font-size: 0.75rem;">
                                         <i class="bi bi-clock me-1"></i><?php echo date('d M Y', strtotime($not['created_at'])); ?>
                                     </small>
                                 </div>
@@ -185,11 +198,11 @@ $extra_label = 'Messages';
             </div>
         </div>
 
-        <!-- Right Side: Direct Messages from Teachers -->
+        <!-- Right Side: Direct Messages -->
         <div class="col-lg-7">
             <div class="modern-card h-100">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots-fill me-2 text-primary"></i>Teacher Messages</h5>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots-fill me-2" style="color: var(--primary);"></i>Teacher Messages</h5>
                     <?php if ($unread_count > 0): ?>
                         <span class="badge bg-danger rounded-pill px-3 py-2"><?php echo $unread_count; ?> Unread</span>
                     <?php else: ?>
@@ -198,37 +211,34 @@ $extra_label = 'Messages';
                 </div>
 
                 <?php if (empty($messages)): ?>
-                    <div class="text-center py-5">
-                        <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
-                            <i class="bi bi-chat-square-text fs-1 text-muted"></i>
-                        </div>
-                        <h6 class="fw-bold text-dark">No messages yet</h6>
-                        <p class="text-muted small mb-0">When your teachers send you direct messages, they will appear here.</p>
+                    <div class="ui-empty">
+                        <i class="bi bi-chat-square-text"></i>
+                        <p>No messages yet</p>
+                        <small>When your teachers send you direct messages, they will appear here.</small>
                     </div>
                 <?php else: ?>
                     <div class="chat-container">
                         <?php foreach ($messages as $msg): 
                             $is_unread = empty($msg['is_read']);
+                            $teacher_name = $msg['sender_name'] ?? 'Teacher';
                         ?>
                             <div class="chat-bubble <?php echo $is_unread ? 'unread' : ''; ?>">
                                 <div class="chat-header">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="teacher-avatar">
-                                            <?php echo htmlspecialchars(strtoupper(substr($msg['sender_name'] ?? 'T', 0, 1))); ?>
+                                            <?php echo htmlspecialchars(strtoupper(substr($teacher_name, 0, 1))); ?>
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-2">
-                                                <h6 class="fw-bold mb-0 text-dark"><?php echo htmlspecialchars($msg['sender_name'] ?? 'Teacher'); ?></h6>
+                                                <!-- Replaced "Staff Member" with "Teacher" -->
+                                                <h6 class="fw-bold mb-0 text-dark"><?php echo htmlspecialchars($teacher_name); ?> <small class="text-muted fw-normal" style="font-size: 0.75rem;">(Teacher)</small></h6>
                                                 <?php if ($is_unread): ?>
                                                     <span class="badge bg-primary" style="font-size: 0.6rem;">NEW</span>
                                                 <?php endif; ?>
                                             </div>
-                                            <small class="text-muted" style="font-size: 0.75rem;">
-                                                <i class="bi bi-person-badge me-1"></i>Staff Member
-                                            </small>
                                         </div>
                                     </div>
-                                    <small class="text-muted" style="font-size: 0.75rem;">
+                                    <small class="text-muted fw-bold" style="font-size: 0.75rem;">
                                         <?php echo date('d M Y, h:i A', strtotime($msg['created_at'])); ?>
                                     </small>
                                 </div>
@@ -237,14 +247,51 @@ $extra_label = 'Messages';
                                     <?php echo nl2br(htmlspecialchars($msg['content'])); ?>
                                 </p>
                                 
-                                <!-- Mark as Read Button -->
-                                <?php if ($is_unread): ?>
-                                    <div class="text-end mt-3 pt-3 border-top">
-                                        <a href="?mark_read=<?php echo $msg['message_id']; ?>" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">
-                                            <i class="bi bi-check2-circle me-1"></i> Mark as Read
+                                <!-- Actions: Reply & Mark Read -->
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                                    <button type="button" class="ui-btn is-primary is-sm" data-bs-toggle="modal" data-bs-target="#replyModal<?php echo $msg['message_id']; ?>">
+                                        <i class="bi bi-reply-fill"></i> Reply
+                                    </button>
+
+                                    <?php if ($is_unread): ?>
+                                        <a href="?mark_read=<?php echo $msg['message_id']; ?>" class="ui-btn is-ghost border border-secondary is-sm">
+                                            <i class="bi bi-check2-circle"></i> Mark as Read
                                         </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <!-- Reply Modal -->
+                            <div class="modal fade" id="replyModal<?php echo $msg['message_id']; ?>" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content ui-modal">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Reply to <?php echo htmlspecialchars($teacher_name); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="teacher_email" value="<?php echo htmlspecialchars($msg['sender_email'] ?? ''); ?>">
+                                                
+                                                <div class="ui-field mb-3">
+                                                    <label>Subject</label>
+                                                    <input type="text" name="subject" class="ui-input" value="Re: <?php echo htmlspecialchars($msg['subject']); ?>" required>
+                                                </div>
+
+                                                <div class="ui-field mb-4">
+                                                    <label>Message</label>
+                                                    <textarea name="content" class="ui-input" rows="4" placeholder="Type your reply here..." required></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="ui-btn is-ghost" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" name="send_reply" class="ui-btn is-primary">
+                                                    <i class="bi bi-send-fill"></i> Send Reply
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
-                                <?php endif; ?>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -256,27 +303,6 @@ $extra_label = 'Messages';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();

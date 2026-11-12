@@ -180,3 +180,31 @@ $extra_label        = $extra_label        ?? '';
         </ul>
     </div>
 </div>
+
+
+<script>
+    // Hamburger & Sidebar Toggle
+    document.addEventListener("DOMContentLoaded", function() {
+        const burger = document.getElementById('hamburger');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        if (burger && sidebar) {
+            burger.addEventListener('click', function() {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
+                } else {
+                    document.body.classList.toggle('sidebar-toggled');
+                }
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        }
+    });
+</script>

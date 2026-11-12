@@ -64,7 +64,7 @@ $has_avatar = !empty($student['avatar']) && file_exists($avatar_path);
 
 $student_display_name = $student['full_name'] ?? 'Student';
 $active_page = 'dashboard';
-$extra_label = 'Student Profile';
+$extra_label = 'My Profile';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,65 +77,48 @@ $extra_label = 'Student Profile';
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --accent-yellow: #b38f00;
-            --sidebar-width: 240px;
+            --primary: #000a66;
+            --primary-soft: #1a2590;
+            --primary-tint: #eef0ff;
+            --accent: #facc15;
+            --accent-tint: #fff6cc;
+            --accent-deep: #8a6a00;
+            --bg-light: #f6f7fb;
+            --white: #ffffff;
+            --ink: #14183a;
+            --text-muted: #5b6280;
+            --line: #e3e6f2;
+            --radius-lg: 24px;
         }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
 
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
+        .ui-badge { display: inline-flex; padding: 5px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        .ui-badge.is-navy { background: var(--primary-tint); color: var(--primary); }
+        .ui-badge.is-gold { background: var(--accent-tint); color: var(--accent-deep); }
+        .ui-badge.is-success { background: #e7f7ee; color: #14633a; }
 
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
+        .profile-avatar { width: 120px; height: 120px; border-radius: 50%; background: var(--primary); color: var(--accent); font-weight: 800; font-size: 3rem; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px -5px rgba(0,10,102,0.3); overflow: hidden; border: 4px solid var(--white); }
+        .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
+        .info-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 6px; }
+        .info-value { font-weight: 700; color: var(--ink); font-size: 1.05rem; margin-bottom: 0; }
 
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
+        .fee-box { padding: 20px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        .fee-box.expected { background: #eff6ff; border-left: 5px solid #3b82f6; }
+        .fee-box.expected h4 { color: #1e3a8a; margin: 0; font-weight: 800; }
+        .fee-box.paid { background: #ecfdf5; border-left: 5px solid #10b981; }
+        .fee-box.paid h4 { color: #065f46; margin: 0; font-weight: 800; }
+        .fee-box.balance { background: #fef2f2; border-left: 5px solid #ef4444; }
+        .fee-box.balance.clear { background: #ecfdf5; border-left: 5px solid #10b981; }
+        .fee-box.balance h4 { color: #991b1b; margin: 0; font-weight: 800; }
+        .fee-box.balance.clear h4 { color: #065f46; }
+        .fee-box .icon { font-size: 2rem; opacity: 0.3; }
 
-        .profile-container { background: white; border-radius: 20px; display: flex; flex-wrap: wrap; padding: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); gap: 40px; }
-        
-        .avatar-section { flex: 0 0 200px; text-align: center; }
-        
-        /* Modern Avatar Image */
-        .avatar-circle { 
-            width: 150px; height: 150px; background: #e2e8f0; border-radius: 50%; 
-            margin: 0 auto; overflow: hidden; border: 5px solid #fff; 
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
-        .avatar-circle i { font-size: 5rem; color: #94a3b8; }
-
-        .info-section { flex: 1; min-width: 300px; }
-        .info-row { display: flex; flex-wrap: wrap; border-bottom: 1px solid #edf2f7; padding: 14px 0; font-size: 0.95rem; }
-        .info-label { flex: 0 0 200px; color: #718096; font-weight: 500; }
-        .info-value { flex: 1; color: #0f172a; font-weight: 700; }
-        .info-value.accent { color: #0d7d8c; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-            .main-content { padding: 20px; }
-        }
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -144,112 +127,119 @@ $extra_label = 'Student Profile';
 <?php include('includes/topbar.php'); ?>
 
 <main class="main-content">
-    <div class="mb-4">
-        <h2 class="fw-bold mb-1 text-dark">My Profile</h2>
-        <p class="text-muted small mb-0">Your official student record</p>
+
+    <div class="ui-head">
+        <div>
+            <h1>My Profile</h1>
+            <p>Your official student record</p>
+        </div>
+        <span class="ui-badge is-navy fs-6 px-3 py-2"><i class="bi bi-mortarboard me-1"></i> <?php echo htmlspecialchars($student_form); ?></span>
     </div>
 
-    <div class="profile-container">
-        <div class="avatar-section">
-            <div class="avatar-circle">
-                <?php if ($has_avatar): ?>
-                    <img src="<?php echo $avatar_path; ?>" alt="Profile Photo">
-                <?php else: ?>
-                    <i class="bi bi-person-fill"></i>
-                <?php endif; ?>
-            </div>
-            <p class="mt-4 fw-bold text-uppercase mb-1 fs-5 text-dark"><?php echo htmlspecialchars($student['full_name'] ?? ''); ?></p>
-            <span class="badge bg-secondary-subtle text-secondary border px-3 py-2"><?php echo htmlspecialchars($student['adm_no'] ?? ''); ?></span>
-        </div>
-
-        <div class="info-section">
-            <div class="info-row">
-                <div class="info-label">Admission No</div>
-                <div class="info-value accent"><?php echo htmlspecialchars($student['adm_no'] ?? ''); ?></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Full Name</div>
-                <div class="info-value text-uppercase"><?php echo htmlspecialchars($student['full_name'] ?? ''); ?></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Gender</div>
-                <div class="info-value"><?php echo htmlspecialchars($student['gender'] ?? '—'); ?></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Date of Birth</div>
-                <div class="info-value">
-                    <?php echo !empty($student['dob']) ? htmlspecialchars(date("d M Y", strtotime($student['dob']))) : '—'; ?>
-                </div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Class / Form</div>
-                <div class="info-value"><?php echo htmlspecialchars($student['form'] ?? '—'); ?></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Parent Contact</div>
-                <div class="info-value"><?php echo htmlspecialchars($student['parent_contact'] ?? '—'); ?></div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Email Address</div>
-                <div class="info-value"><?php echo htmlspecialchars($student['email'] ?? '—'); ?></div>
-            </div>
-
-            <?php if ($total_fees > 0 || $amount_paid > 0): ?>
-                <div class="info-row" style="border-top: 2px solid #e2e8f0; margin-top: 20px; padding-top: 20px;">
-                    <div class="info-label">Total Fees (<?php echo htmlspecialchars($student_form); ?>)</div>
-                    <div class="info-value">KES <?php echo number_format($total_fees, 2); ?></div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Amount Paid</div>
-                    <div class="info-value">KES <?php echo number_format($amount_paid, 2); ?></div>
-                </div>
-                <div class="info-row" style="border-bottom: none;">
-                    <div class="info-label fw-bold">Balance</div>
-                    <div class="info-value fw-bold fs-5 <?php echo $balance > 0 ? 'text-danger' : 'text-success'; ?>">
-                        KES <?php echo number_format($balance, 2); ?>
+    <div class="row g-4">
+        <!-- Left Side: Student Info -->
+        <div class="col-lg-5">
+            <div class="panel h-100">
+                <div class="d-flex flex-column align-items-center text-center mb-4">
+                    <div class="profile-avatar mb-3">
+                        <?php if ($has_avatar): ?>
+                            <img src="<?php echo $avatar_path; ?>" alt="Profile Photo">
+                        <?php else: ?>
+                            <?php echo htmlspecialchars(strtoupper(substr($student_display_name, 0, 1))); ?>
+                        <?php endif; ?>
+                    </div>
+                    <h4 class="fw-bold mb-1 text-uppercase" style="color: var(--ink);"><?php echo htmlspecialchars($student_display_name); ?></h4>
+                    <p class="text-muted mb-3"><i class="bi bi-hash"></i> <?php echo htmlspecialchars($student['adm_no'] ?? ''); ?></p>
+                    
+                    <div class="d-flex gap-2">
+                        <span class="ui-badge is-navy"><i class="bi bi-person-badge me-1"></i> Student</span>
+                        <?php if (!empty($student['gender'])): ?>
+                            <span class="ui-badge is-gold"><?php echo htmlspecialchars($student['gender']); ?></span>
+                        <?php endif; ?>
                     </div>
                 </div>
-            <?php else: ?>
-                <div class="info-row" style="border-bottom: none; margin-top: 20px;">
-                    <div class="info-label">Fee Record</div>
-                    <div class="info-value text-muted">No fee record on file yet</div>
+
+                <hr class="text-muted opacity-25">
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <p class="info-label">Date of Birth</p>
+                        <p class="info-value"><?php echo !empty($student['dob']) ? htmlspecialchars(date("d M Y", strtotime($student['dob']))) : '—'; ?></p>
+                    </div>
+                    <div class="col-12">
+                        <p class="info-label">Parent Contact</p>
+                        <p class="info-value"><?php echo htmlspecialchars($student['parent_contact'] ?? '—'); ?></p>
+                    </div>
+                    <div class="col-12">
+                        <p class="info-label">Email Address</p>
+                        <p class="info-value text-truncate"><?php echo htmlspecialchars($student['email'] ?? '—'); ?></p>
+                    </div>
                 </div>
-            <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Right Side: Fee Statement -->
+        <div class="col-lg-7">
+            <div class="panel h-100">
+                <h5 class="fw-bold mb-4" style="color: var(--primary);"><i class="bi bi-wallet2 me-2"></i>Fee Statement</h5>
+
+                <?php if ($total_fees == 0 && $amount_paid == 0): ?>
+                    <div class="ui-alert is-warning m-0">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        <div><strong>No Fee Records Found.</strong><br>The administration has not yet published a fee structure for your class or recorded any payments.</div>
+                    </div>
+                <?php else: ?>
+                    <div class="fee-box expected">
+                        <div>
+                            <small class="text-uppercase fw-bold text-primary mb-1 d-block" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Expected Fees</small>
+                            <h4>KES <?php echo number_format($total_fees, 2); ?></h4>
+                        </div>
+                        <i class="bi bi-receipt icon text-primary"></i>
+                    </div>
+
+                    <div class="fee-box paid">
+                        <div>
+                            <small class="text-uppercase fw-bold text-success mb-1 d-block" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Amount Paid</small>
+                            <h4>KES <?php echo number_format($amount_paid, 2); ?></h4>
+                        </div>
+                        <i class="bi bi-check-circle icon text-success"></i>
+                    </div>
+
+                    <div class="fee-box balance <?php echo $balance <= 0 ? 'clear' : ''; ?>">
+                        <div>
+                            <small class="text-uppercase fw-bold <?php echo $balance <= 0 ? 'text-success' : 'text-danger'; ?> mb-1 d-block" style="font-size: 0.75rem; letter-spacing: 0.05em;">Outstanding Balance</small>
+                            <h4>KES <?php echo number_format($balance, 2); ?></h4>
+                        </div>
+                        <i class="bi <?php echo $balance <= 0 ? 'bi-emoji-smile' : 'bi-exclamation-octagon'; ?> icon <?php echo $balance <= 0 ? 'text-success' : 'text-danger'; ?>"></i>
+                    </div>
+
+                    <?php if ($balance <= 0): ?>
+                        <div class="p-3 rounded-3 text-center mt-3" style="background: #ecfdf5; color: #065f46; border: 1px dashed #10b981;">
+                            <i class="bi bi-patch-check-fill me-2"></i> <strong>Your fees are fully paid. Thank you!</strong>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
+    // Submenu Toggle Logic - MUST BE ON EVERY PAGE
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             const sub = this.nextElementSibling;
             const icon = this.querySelector('.bi-plus, .bi-dash');
             const isClosed = sub.style.display === "none" || sub.style.display === "";
+            
             sub.style.display = isClosed ? "block" : "none";
-            if (icon) icon.classList.replace(isClosed ? 'bi-plus' : 'bi-dash', isClosed ? 'bi-dash' : 'bi-plus');
+            
+            if (icon) {
+                if (isClosed) icon.classList.replace('bi-plus', 'bi-dash');
+                else icon.classList.replace('bi-dash', 'bi-plus');
+            }
         });
     });
 </script>

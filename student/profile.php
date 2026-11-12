@@ -23,38 +23,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email   = trim($_POST['email']   ?? '');
     $dob     = trim($_POST['dob']     ?? '');
     
-    // Initialize avatar variable (keeps existing if no new upload)
     $new_avatar_name = null;
 
-    // --- HANDLE IMAGE UPLOAD ---
+    // Handle Image Upload
     if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['avatar']['tmp_name'];
         $fileName = $_FILES['avatar']['name'];
         $fileSize = $_FILES['avatar']['size'];
-        $fileType = $_FILES['avatar']['type'];
         
         $fileNameCmps = explode(".", $fileName);
         $fileExtension = strtolower(end($fileNameCmps));
-        
-        // Allowed file types
         $allowedfileExtensions = array('jpg', 'gif', 'png', 'jpeg');
         
         if (in_array($fileExtension, $allowedfileExtensions)) {
             if ($fileSize < 2000000) { // Max 2MB
-                // Generate unique name to prevent overwriting
                 $new_avatar_name = md5(time() . $fileName) . '.' . $fileExtension;
                 $uploadFileDir = '../images/avatars/';
                 
-                // Create directory if it doesn't exist
-                if (!is_dir($uploadFileDir)) {
-                    mkdir($uploadFileDir, 0755, true);
-                }
+                if (!is_dir($uploadFileDir)) mkdir($uploadFileDir, 0755, true);
                 
                 $dest_path = $uploadFileDir . $new_avatar_name;
-                
                 if(!move_uploaded_file($fileTmpPath, $dest_path)) {
                     $error_msg = 'There was an error moving the uploaded file.';
-                    $new_avatar_name = null; // reset so we don't save a broken link
+                    $new_avatar_name = null;
                 }
             } else {
                 $error_msg = 'File is too large. Max size is 2MB.';
@@ -64,14 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Only update DB if there are no upload errors
     if (empty($error_msg)) {
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error_msg = 'Please enter a valid email address.';
         } elseif ($dob !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
             $error_msg = 'Please enter a valid date of birth.';
         } else {
-            // Build query dynamically depending on what changed
             $query = "UPDATE students SET parent_contact = ?, address = ?, email = ?";
             $params = [$phone, $address, $email];
             $types = "sss";
@@ -106,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Success flash from redirect
 if (isset($_GET['msg']) && $_GET['msg'] === 'updated') {
     $success_msg = 'Your profile has been updated successfully.';
 }
@@ -118,15 +106,10 @@ $stmt->execute();
 $student = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$student) {
-    die("Student record not found. Please contact administration.");
-}
+if (!$student) die("Student record not found. Please contact administration.");
 
-// Format DOB for the date input (must be YYYY-MM-DD)
 $dob_value = '';
-if (!empty($student['dob'])) {
-    $dob_value = date('Y-m-d', strtotime($student['dob']));
-}
+if (!empty($student['dob'])) $dob_value = date('Y-m-d', strtotime($student['dob']));
 
 $avatar_path = "../images/avatars/" . ($student['avatar'] ?? '');
 $has_avatar = !empty($student['avatar']) && file_exists($avatar_path);
@@ -144,67 +127,44 @@ $extra_label = 'Edit Profile';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root {
-            --sidebar-bg: #34445c;
-            --submenu-bg: #2c3a4d;
-            --primary-blue: #1a3066;
-            --sidebar-width: 240px;
-        }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; scrollbar-width: thin; scrollbar-color: #4b5a71 var(--sidebar-bg); }
-        .sidebar::-webkit-scrollbar { width: 5px; }
-        .sidebar::-webkit-scrollbar-thumb { background: #4b5a71; border-radius: 10px; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
-
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .edit-card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); padding: 40px; max-width: 700px; margin: 0 auto; }
+        :root { --primary: #000a66; --primary-soft: #1a2590; --primary-tint: #eef0ff; --accent: #facc15; --accent-tint: #fff6cc; --accent-deep: #8a6a00; --bg-light: #f6f7fb; --white: #ffffff; --ink: #14183a; --text-muted: #5b6280; --line: #e3e6f2; --radius-lg: 24px; }
         
-        .form-label { font-size: 0.8rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-        .form-control { border-radius: 12px; padding: 12px 16px; border: 1px solid #cbd5e1; font-size: 0.95rem; background: #f8fafc; transition: all 0.2s; }
-        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(26,48,102,0.1); background: #fff; }
-        .form-control[readonly] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
+        .ui-btn.is-ghost { background: var(--white); border-color: var(--line); color: var(--primary); }
+        .ui-btn.is-ghost:hover { background: var(--primary-tint); }
 
-        /* Modern Avatar Upload */
-        .avatar-upload-container { display: flex; align-items: center; gap: 25px; margin-bottom: 30px; padding-bottom: 30px; border-bottom: 1px solid #e2e8f0; }
+        .ui-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; border-radius: 16px; margin-bottom: 24px; font-size: 0.95rem; font-weight: 600; line-height: 1.5; }
+        .ui-alert i { font-size: 1.15rem; line-height: 1.4; }
+        .ui-alert.is-success { background: #e7f7ee; color: #14633a; }
+        .ui-alert.is-danger  { background: #fdeaea; color: #a42525; }
+
+        .ui-field label { display: block; margin-bottom: 8px; font-size: 0.88rem; font-weight: 700; color: var(--ink); }
+        .ui-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px; background-color: var(--bg-light); font-family: inherit; font-size: 0.95rem; font-weight: 500; color: var(--ink); transition: all 0.2s; }
+        .ui-input:focus { outline: none; border-color: var(--primary); background-color: var(--white); box-shadow: 0 0 0 4px rgba(0, 10, 102, 0.1); }
+        .ui-input[readonly] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #e2e8f0; }
+
+        .edit-card { max-width: 700px; margin: 0 auto; }
         
-        .avatar-preview { 
-            width: 100px; height: 100px; border-radius: 50%; object-fit: cover; 
-            border: 4px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
-            background: #f1f5f9; display: flex; align-items: center; justify-content: center;
-        }
-        .avatar-preview i { font-size: 3rem; color: #cbd5e1; }
-        
-        .avatar-info h5 { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; color: #1e293b; }
-        .avatar-info p { font-size: 0.85rem; color: #64748b; margin-bottom: 12px; }
+        .avatar-upload-container { display: flex; align-items: center; gap: 25px; margin-bottom: 30px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
+        .avatar-preview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid var(--white); box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: var(--primary-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .avatar-preview i { font-size: 3rem; color: var(--primary); }
+        .avatar-info h5 { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
+        .avatar-info p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
         
         .btn-upload { position: relative; overflow: hidden; display: inline-block; }
         .btn-upload input[type=file] { position: absolute; font-size: 100px; right: 0; top: 0; opacity: 0; cursor: pointer; }
 
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
         @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
             .main-content { padding: 20px; }
             .avatar-upload-container { flex-direction: column; text-align: center; }
         }
@@ -217,118 +177,93 @@ $extra_label = 'Edit Profile';
 
 <main class="main-content">
 
-    <div class="mb-4 text-center">
-        <h2 class="fw-bold mb-1 text-dark">Account Settings</h2>
-        <p class="text-muted small mb-0">Update your personal information and profile photo</p>
+    <div class="ui-head">
+        <div>
+            <h1>Account Settings</h1>
+            <p>Update your personal information and profile photo</p>
+        </div>
     </div>
 
-    <?php if ($success_msg): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center mb-4 mx-auto" style="max-width: 700px;">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <span class="fw-medium"><?php echo htmlspecialchars($success_msg); ?></span>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($error_msg): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center mb-4 mx-auto" style="max-width: 700px;">
-            <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
-            <span class="fw-medium"><?php echo htmlspecialchars($error_msg); ?></span>
-        </div>
-    <?php endif; ?>
-
     <div class="edit-card">
-        <form method="POST" action="profile.php" enctype="multipart/form-data">
+        
+        <?php if ($success_msg): ?>
+            <div class="ui-alert is-success"><i class="bi bi-check-circle-fill"></i><div><?php echo htmlspecialchars($success_msg); ?></div></div>
+        <?php endif; ?>
+        <?php if ($error_msg): ?>
+            <div class="ui-alert is-danger"><i class="bi bi-exclamation-circle-fill"></i><div><?php echo htmlspecialchars($error_msg); ?></div></div>
+        <?php endif; ?>
 
-            <!-- Avatar Upload Section -->
-            <div class="avatar-upload-container">
-                <?php if ($has_avatar): ?>
-                    <img src="<?php echo $avatar_path; ?>" alt="Profile Photo" class="avatar-preview" id="avatarPreview">
-                <?php else: ?>
-                    <div class="avatar-preview" id="avatarPreview">
-                        <i class="bi bi-person-fill"></i>
+        <div class="panel">
+            <form method="POST" action="profile.php" enctype="multipart/form-data">
+
+                <!-- Avatar Upload Section -->
+                <div class="avatar-upload-container">
+                    <?php if ($has_avatar): ?>
+                        <img src="<?php echo $avatar_path; ?>" alt="Profile Photo" class="avatar-preview" id="avatarPreview">
+                    <?php else: ?>
+                        <div class="avatar-preview" id="avatarPreview">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <div class="avatar-info">
+                        <h5>Profile Photo</h5>
+                        <p>Upload a new avatar. Max size: 2MB (JPG, PNG).</p>
+                        <div class="ui-btn is-ghost border border-secondary btn-upload">
+                            <i class="bi bi-camera-fill"></i> Choose Photo
+                            <input type="file" name="avatar" id="avatarInput" accept="image/png, image/jpeg, image/jpg">
+                        </div>
                     </div>
-                <?php endif; ?>
-                
-                <div class="avatar-info">
-                    <h5>Profile Photo</h5>
-                    <p>Upload a new avatar. Max size: 2MB (JPG, PNG).</p>
-                    <div class="btn btn-outline-primary btn-upload rounded-pill px-4 fw-bold">
-                        <i class="bi bi-camera-fill me-2"></i> Choose Photo
-                        <input type="file" name="avatar" id="avatarInput" accept="image/png, image/jpeg, image/jpg">
+                </div>
+
+                <!-- Personal Info Section -->
+                <div class="ui-field mb-3">
+                    <label>Full Name</label>
+                    <input type="text" class="ui-input" value="<?php echo htmlspecialchars($student['full_name'] ?? ''); ?>" readonly>
+                    <small class="text-muted mt-1 d-block">Contact admin to change your legal name.</small>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6 ui-field">
+                        <label>Admission No</label>
+                        <input type="text" class="ui-input" value="<?php echo htmlspecialchars($student['adm_no'] ?? ''); ?>" readonly>
+                    </div>
+                    <div class="col-md-6 ui-field">
+                        <label>Date of Birth</label>
+                        <input type="date" name="dob" class="ui-input" value="<?php echo htmlspecialchars($dob_value); ?>" max="<?php echo date('Y-m-d'); ?>">
                     </div>
                 </div>
-            </div>
 
-            <!-- Personal Info Section -->
-            <div class="mb-3">
-                <label class="form-label">Full Name</label>
-                <input type="text" class="form-control" value="<?php echo htmlspecialchars($student['full_name'] ?? ''); ?>" readonly>
-                <small class="text-muted mt-1 d-block">Contact admin to change your legal name.</small>
-            </div>
-
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">Admission No</label>
-                    <input type="text" class="form-control" value="<?php echo htmlspecialchars($student['adm_no'] ?? ''); ?>" readonly>
+                <div class="ui-field mb-3">
+                    <label>Phone Number</label>
+                    <input type="text" name="phone" class="ui-input" value="<?php echo htmlspecialchars($student['parent_contact'] ?? ''); ?>" placeholder="07..." required>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Date of Birth</label>
-                    <input type="date" name="dob" class="form-control" value="<?php echo htmlspecialchars($dob_value); ?>" max="<?php echo date('Y-m-d'); ?>">
+
+                <div class="ui-field mb-3">
+                    <label>Email Address</label>
+                    <input type="email" name="email" class="ui-input" value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>" placeholder="you@example.com" required>
                 </div>
-            </div>
 
-            <div class="mb-3">
-                <label class="form-label">Phone Number</label>
-                <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($student['parent_contact'] ?? ''); ?>" placeholder="07..." required>
-            </div>
+                <div class="ui-field mb-4">
+                    <label>Physical Address</label>
+                    <textarea name="address" class="ui-input" rows="2" placeholder="e.g. Westlands, Nairobi"><?php echo htmlspecialchars($student['address'] ?? ''); ?></textarea>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>" placeholder="you@example.com" required>
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label">Physical Address</label>
-                <textarea name="address" class="form-control" rows="2" placeholder="e.g. Westlands, Nairobi"><?php echo htmlspecialchars($student['address'] ?? ''); ?></textarea>
-            </div>
-
-            <div class="d-flex justify-content-between mt-4 pt-4 border-top">
-                <a href="dashboard_view.php" class="btn btn-light border rounded-pill px-4 fw-bold">
-                    Cancel
-                </a>
-                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
-                    <i class="bi bi-save me-2"></i>Save Changes
-                </button>
-            </div>
-        </form>
+                <div class="d-flex justify-content-between mt-4 pt-4 border-top">
+                    <a href="dashboard_view.php" class="ui-btn is-ghost">Cancel</a>
+                    <button type="submit" class="ui-btn is-primary">
+                        <i class="bi bi-save"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Sidebar Toggles
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
+    // Submenu toggle logic
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -350,14 +285,12 @@ $extra_label = 'Edit Profile';
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // If it's currently a div with an icon, replace it with an img tag
                     if (avatarPreview.tagName === 'DIV') {
                         const newImg = document.createElement('img');
                         newImg.id = 'avatarPreview';
                         newImg.className = 'avatar-preview';
                         newImg.src = e.target.result;
                         avatarPreview.replaceWith(newImg);
-                        // Update global reference
                         window.avatarPreview = newImg; 
                     } else {
                         avatarPreview.src = e.target.result;

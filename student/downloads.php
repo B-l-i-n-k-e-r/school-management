@@ -12,7 +12,6 @@ if (!isset($_SESSION['adm_no']) || ($_SESSION['role'] ?? '') !== 'student') {
 
 $adm_no = $_SESSION['adm_no'];
 
-// Fetch student
 $stmt = $conn->prepare("SELECT student_id, adm_no, full_name, form FROM students WHERE adm_no = ? LIMIT 1");
 $stmt->bind_param("s", $adm_no);
 $stmt->execute();
@@ -21,14 +20,12 @@ $stmt->close();
 
 if (!$student) die("Student record not found.");
 
-// Fetch Admin-uploaded downloads
 $files = [];
 $d_stmt = $conn->query("SELECT * FROM downloads ORDER BY category ASC, created_at DESC");
 if ($d_stmt) {
     while ($row = $d_stmt->fetch_assoc()) $files[] = $row;
 }
 
-// Group by category
 $grouped = [];
 foreach ($files as $f) {
     $grouped[$f['category'] ?? 'Other'][] = $f;
@@ -37,11 +34,11 @@ foreach ($files as $f) {
 function file_icon($type) {
     $t = strtolower($type ?? '');
     return match(true) {
-        str_contains($t, 'pdf')                  => 'file-earmark-pdf-fill text-danger',
+        str_contains($t, 'pdf') => 'file-earmark-pdf-fill text-danger',
         str_contains($t, 'zip') || str_contains($t, 'rar') => 'file-earmark-zip-fill text-warning',
-        str_contains($t, 'doc')                  => 'file-earmark-word-fill text-primary',
-        str_contains($t, 'xls')                  => 'file-earmark-excel-fill text-success',
-        default                                  => 'file-earmark-text-fill text-secondary',
+        str_contains($t, 'doc') => 'file-earmark-word-fill text-primary',
+        str_contains($t, 'xls') => 'file-earmark-excel-fill text-success',
+        default => 'file-earmark-text-fill text-secondary',
     };
 }
 
@@ -58,51 +55,34 @@ $extra_label = 'Downloads';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --sidebar-bg: #34445c; --submenu-bg: #2c3a4d; --primary-blue: #1a3066; --sidebar-width: 240px; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; margin:0; overflow-x: hidden; transition: all 0.3s; }
-
-        .sidebar { width: var(--sidebar-width); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; z-index: 1200; transition: all 0.3s ease; }
-        body.sidebar-toggled .sidebar { left: calc(-1 * var(--sidebar-width)); }
-        body.sidebar-toggled .topbar, body.sidebar-toggled .main-content { margin-left: 0; }
-        .sidebar-header { background: #dee2e6; padding: 10px 15px; display: flex; align-items: center; gap: 10px; height: 70px; }
-        .sidebar-header img { height: 40px; object-fit: contain; }
-        .sidebar-header span { color: var(--primary-blue); font-weight: 800; font-size: 0.85rem; }
-        .nav-item { border-bottom: 1px solid #4a5568; }
-        .nav-link { color: #cbd5e0; padding: 12px 20px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        .nav-link:hover, .nav-link.active { background: #4a5568; color: white; }
-        .submenu { background: var(--submenu-bg); display: none; list-style: none; padding: 0; margin: 0; }
-        .submenu li a { color: #fff; padding: 10px 20px 10px 45px; display: block; text-decoration: none; font-size: 0.85rem; }
-        .submenu li a:hover { background: #3e4d63; color: #f6e05e; }
-
-        .topbar { margin-left: var(--sidebar-width); background: #fff; height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease; }
-        .user-dropdown { background: var(--primary-blue); color: white; padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; }
-        .main-content { margin-left: var(--sidebar-width); padding: 40px; transition: all 0.3s ease; }
-
-        .file-card { border: none; border-radius: 20px; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
-        .file-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.08); }
+        :root { --primary: #000a66; --primary-soft: #1a2590; --primary-tint: #eef0ff; --accent: #facc15; --accent-tint: #fff6cc; --accent-deep: #8a6a00; --bg-light: #f6f7fb; --white: #ffffff; --ink: #14183a; --text-muted: #5b6280; --line: #e3e6f2; --radius-lg: 24px; }
+        .panel { background: var(--white); border-radius: var(--radius-lg); padding: 28px; box-shadow: 0 24px 48px -28px rgba(0, 10, 102, 0.22); }
+        .ui-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+        .ui-head h1 { margin: 0 0 4px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; color: var(--primary); }
+        .ui-head p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: 1.5px solid transparent; border-radius: 99px; font-family: inherit; font-size: 0.9rem; font-weight: 800; line-height: 1.2; text-decoration: none; cursor: pointer; transition: all 0.2s; }
+        .ui-btn:hover { transform: translateY(-1px); }
+        .ui-btn.is-primary { background: var(--accent); color: var(--primary); }
+        .ui-btn.is-primary:hover { background: #ffd93d; color: var(--primary); box-shadow: 0 12px 20px -10px rgba(250, 204, 21, 0.9); }
         
-        .icon-box { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: #f8fafc; }
+        .file-card { border: none; border-radius: 20px; background: var(--white); box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.3s, box-shadow 0.3s; overflow: hidden; height: 100%; display: flex; flex-direction: column; border: 1.5px solid var(--line); }
+        .file-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.08); }
+        .icon-box { width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; background: var(--bg-light); }
         .category-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border-radius: 50px; font-weight: 800; }
-
-        .sys-card { background: linear-gradient(135deg, #1a3066 0%, #2d4a8a 100%); color: white; border-radius: 20px; padding: 25px; height: 100%; display: flex; flex-direction: column; position: relative; overflow: hidden; text-decoration: none; }
+        
+        .sys-card { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-soft) 100%); color: white; border-radius: 20px; padding: 25px; height: 100%; display: flex; flex-direction: column; position: relative; overflow: hidden; text-decoration: none; }
         .sys-card::after { content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: rgba(255,255,255,0.05); border-radius: 50%; }
         .sys-card:hover { color: white; transform: translateY(-5px); box-shadow: 0 12px 25px rgba(26, 48, 102, 0.3); }
-        .sys-icon { font-size: 2rem; margin-bottom: 15px; color: #fbbf24; }
-
-        .search-box { max-width: 350px; width: 100%; }
-        .search-box input { border-radius: 50px 0 0 50px; padding-left: 20px; border: 1px solid #cbd5e1; }
-        .search-box .input-group-text { border-radius: 0 50px 50px 0; border-left: none; border-color: #cbd5e1; }
-
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; }
-        .sidebar-overlay.active { display: block; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: calc(-1 * var(--sidebar-width)); }
-            .sidebar.active { left: 0 !important; }
-            .topbar, .main-content { margin-left: 0 !important; }
-            .main-content { padding: 20px; }
-        }
+        .sys-icon { font-size: 2rem; margin-bottom: 15px; color: var(--accent); }
+        
+        .ui-search { position: relative; width: 260px; max-width: 100%; }
+        .ui-search i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .ui-search input { width: 100%; box-sizing: border-box; padding: 11px 16px 11px 42px; border: 1.5px solid var(--line); border-radius: 99px; background: var(--bg-light); font-family: inherit; font-size: 0.9rem; color: var(--ink); }
+        .ui-search input:focus { outline: none; border-color: var(--primary); background: var(--white); }
+        
+        @media (max-width: 992px) { .main-content { padding: 20px; } }
     </style>
 </head>
 <body>
@@ -112,87 +92,78 @@ $extra_label = 'Downloads';
 
 <main class="main-content">
 
-    <div class="d-flex justify-content-between align-items-start mb-5 flex-wrap gap-3">
+    <div class="ui-head">
         <div>
-            <h2 class="fw-bold mb-1 text-dark">Student Resources</h2>
-            <p class="text-muted small mb-0">Download official documents, forms, and study materials</p>
+            <h1>Student Resources</h1>
+            <p>Download official documents, forms, and study materials</p>
         </div>
-        <div class="input-group search-box shadow-sm">
-            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-            <input type="text" id="fileSearch" class="form-control border-start-0" placeholder="Search resources...">
-        </div>
+        <label class="ui-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="fileSearch" placeholder="Search resources...">
+        </label>
     </div>
 
-    <!-- SECTION 1: System Generated Documents -->
+    <!-- System Generated Documents -->
     <div class="mb-5">
         <h5 class="fw-bold mb-3 text-uppercase small text-muted" style="letter-spacing: 0.1em;">
-            <i class="bi bi-cpu-fill me-2 text-primary"></i>System Generated Documents
+            <i class="bi bi-cpu-fill me-2" style="color: var(--primary);"></i>System Generated Documents
         </h5>
         <div class="row g-4">
-            
-            <!-- Exam Card -->
             <div class="col-md-6 col-lg-4 col-xl-3">
                 <div class="sys-card">
                     <i class="bi bi-person-vcard-fill sys-icon"></i>
                     <h6 class="fw-bold mb-1 mt-auto">Exam Card</h6>
                     <small class="text-white-50 mb-3">Official exam pass</small>
-                    <a href="print_document.php?type=exam_card" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
-                        <i class="bi bi-download me-1"></i> Download
+                    <a href="print_document.php?type=exam_card" target="_blank" class="ui-btn is-primary w-100 mt-2">
+                        <i class="bi bi-download"></i> Download
                     </a>
                 </div>
             </div>
-
-            <!-- Timetable -->
             <div class="col-md-6 col-lg-4 col-xl-3">
                 <div class="sys-card">
                     <i class="bi bi-calendar3 sys-icon"></i>
                     <h6 class="fw-bold mb-1 mt-auto">Class Timetable</h6>
                     <small class="text-white-50 mb-3">Weekly class schedule</small>
-                    <a href="print_document.php?type=timetable" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
-                        <i class="bi bi-download me-1"></i> Download
+                    <a href="print_document.php?type=timetable" target="_blank" class="ui-btn is-primary w-100 mt-2">
+                        <i class="bi bi-download"></i> Download
                     </a>
                 </div>
             </div>
-
-            <!-- Fee Structure -->
             <div class="col-md-6 col-lg-4 col-xl-3">
                 <div class="sys-card">
                     <i class="bi bi-list-columns-reverse sys-icon"></i>
                     <h6 class="fw-bold mb-1 mt-auto">Fee Structure</h6>
                     <small class="text-white-50 mb-3">Expected fees breakdown</small>
-                    <a href="print_document.php?type=fee_structure" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
-                        <i class="bi bi-download me-1"></i> Download
+                    <a href="print_document.php?type=fee_structure" target="_blank" class="ui-btn is-primary w-100 mt-2">
+                        <i class="bi bi-download"></i> Download
                     </a>
                 </div>
             </div>
-
-            <!-- Fee Statement -->
             <div class="col-md-6 col-lg-4 col-xl-3">
                 <div class="sys-card">
                     <i class="bi bi-receipt-cutoff sys-icon"></i>
                     <h6 class="fw-bold mb-1 mt-auto">Fee Statement</h6>
                     <small class="text-white-50 mb-3">Financial statement</small>
-                    <a href="print_document.php?type=fees" target="_blank" class="btn btn-light text-primary fw-bold rounded-pill mt-2 w-100">
-                        <i class="bi bi-download me-1"></i> Download
+                    <a href="print_document.php?type=fees" target="_blank" class="ui-btn is-primary w-100 mt-2">
+                        <i class="bi bi-download"></i> Download
                     </a>
                 </div>
             </div>
-
         </div>
     </div>
 
-    <!-- SECTION 2: Uploaded Study Materials -->
+    <!-- Uploaded Study Materials -->
     <?php if (empty($files)): ?>
-        <div class="card p-5 text-center mt-4">
-            <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
-                <i class="bi bi-folder2-open fs-1 text-muted"></i>
+        <div class="panel text-center">
+            <div class="ui-empty">
+                <i class="bi bi-folder2-open"></i>
+                <p>No resources uploaded</p>
+                <small>The administration has not posted any downloadable files yet.</small>
             </div>
-            <h5 class="fw-bold text-dark">No resources uploaded</h5>
-            <p class="text-muted mb-0">The administration has not posted any downloadable files yet.</p>
         </div>
     <?php else: ?>
         <h5 class="fw-bold mb-3 text-uppercase small text-muted" style="letter-spacing: 0.1em;">
-            <i class="bi bi-folder-fill me-2 text-primary"></i>School Resources
+            <i class="bi bi-folder-fill me-2" style="color: var(--primary);"></i>School Resources
         </h5>
         
         <?php foreach ($grouped as $category => $category_files): ?>
@@ -222,9 +193,9 @@ $extra_label = 'Downloads';
                                     &middot; <i class="bi bi-calendar3 me-1"></i><?php echo !empty($file['created_at']) ? htmlspecialchars(date('M d, Y', strtotime($file['created_at']))) : '—'; ?>
                                 </p>
                                 <a href="<?php echo htmlspecialchars($file['file_path'] ?? '#'); ?>"
-                                   class="btn btn-primary w-100 fw-bold rounded-pill mt-auto"
+                                   class="ui-btn is-primary w-100 mt-auto"
                                    download>
-                                    <i class="bi bi-download me-2"></i>Download File
+                                    <i class="bi bi-download"></i> Download File
                                 </a>
                             </div>
                         </div>
@@ -238,27 +209,6 @@ $extra_label = 'Downloads';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (window.innerWidth <= 992) {
-                sidebar.classList.toggle('active');
-                if (overlay) overlay.classList.toggle('active');
-            } else {
-                document.body.classList.toggle('sidebar-toggled');
-            }
-        });
-    }
-    if (overlay) {
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-    }
-
     document.querySelectorAll('.dropdown-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -270,17 +220,13 @@ $extra_label = 'Downloads';
         });
     });
 
-    // Live search
-    const search = document.getElementById('fileSearch');
-    if (search) {
-        search.addEventListener('input', function(e) {
-            const term = e.target.value.toLowerCase();
-            document.querySelectorAll('.file-item').forEach(item => {
-                const text = item.innerText.toLowerCase();
-                item.style.display = text.includes(term) ? '' : 'none';
-            });
+    document.getElementById('fileSearch')?.addEventListener('input', function(e) {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('.file-item').forEach(item => {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(term) ? '' : 'none';
         });
-    }
+    });
 </script>
 </body>
 </html>
